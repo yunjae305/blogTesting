@@ -1,0 +1,20 @@
+{
+  "name": "blog-it",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Blog-it — 프론트엔드(React) 워크스페이스. 백엔드는 apps/api의 파이썬 프로젝트입니다.",
+  "type": "module",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace apps/web",
+    "build": "npm run build --workspace apps/web",
+    "lint": "npm run lint --workspace apps/web",
+    "test": "npm run test --workspace apps/web && npm run api:test",
+    "api:test": "python -m pytest apps/api/tests"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

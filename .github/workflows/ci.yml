@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  api:
+    name: 백엔드 (FastAPI)
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: 한글 렌더링 글꼴 설치
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes fonts-noto-cjk
+      - run: pip install -r apps/api/requirements.txt
+      # Must run from apps/api: `app` is only importable with that on sys.path.
+      - run: python -m pytest -q
+        working-directory: apps/api
+
+  web:
+    name: 프론트엔드 (React)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npm run lint
+      - run: npm run test --workspace apps/web
+      - run: npm run build

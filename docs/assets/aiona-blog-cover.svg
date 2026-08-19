@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 966 600" width="966" height="600" role="img" aria-labelledby="cover-title cover-desc">
+  <title id="cover-title">AIONA — 필요한 작업을 골라 쓰는 AI 작업실</title>
+  <desc id="cover-desc">어두운 차콜 배경 위에 AIONA 워드마크와, 자료 조사·문서 요약·번역·이메일 작성·회의 준비·주간 식단 짜기 여섯 개의 작업 카드가 놓인 블로그 대문.</desc>
+
+  <!--
+    AIONA 블로그 대문 (네이버 블로그 PC 대문 기준 966 × 600).
+
+    무엇을 느끼게 하려는가: **소개받음 → 이해함 → 나도 한번 써 보고 싶음.**
+    "이게 뭐지?"가 먼저 오면 실패다. 그래서 첫 화면에 추상적인 문구가 아니라 **실제로
+    꺼내 쓸 수 있는 작업들**을 나열한다 — 도구함을 열어 보여 주는 그림이다.
+
+    쓰지 않은 것과 그 이유:
+    - 로봇·뇌·회로 이미지: "AI 일반"을 그리면 무엇을 하는 서비스인지가 사라진다.
+      여기서 팔아야 하는 것은 AI가 아니라 **오늘 할 일이 끝난다는 것**이다.
+    - 다른 회사 모델 이름·로고: 어떤 모델을 쓰는지는 바뀔 수 있고, 그림에 박아 두면
+      그것이 사실 주장이 된다. "여러 모델 중에서 고른다"는 성질만 점으로 표현한다.
+    - 사진: 대문은 게시물마다 바뀌지 않는 자리라 사진이 낡는다. 벡터라 어느 배율에서도
+      선명하고, 문구만 고쳐 다시 쓸 수 있다.
+
+    카드 이름은 브랜드 자료의 기준표(docs/AIONA-콘텐츠-운영.md)와 **같은 이름**이어야
+    한다. 글에 나오는 기능명과 대문의 기능명이 다르면 같은 서비스로 읽히지 않는다.
+  -->
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#191C22"/>
+      <stop offset="1" stop-color="#0E1014"/>
+    </linearGradient>
+
+    <!-- 카드 표면. 배경보다 아주 조금만 밝다 — 카드가 떠 보이되 배경을 이기지 않는다. -->
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#23262E"/>
+      <stop offset="1" stop-color="#1C1F26"/>
+    </linearGradient>
+
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFE001"/>
+      <stop offset="1" stop-color="#FFB800"/>
+    </linearGradient>
+
+    <!-- 오른쪽 위의 아주 옅은 빛. 평평한 검정을 깨는 정도로만 둔다. -->
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFE001" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#FFE001" stop-opacity="0"/>
+    </radialGradient>
+
+    <g id="ico-search">
+      <circle cx="9.5" cy="9.5" r="6.5"/>
+      <path d="M14.5 14.5 L20 20"/>
+    </g>
+    <g id="ico-summary">
+      <path d="M4 3h11l4 4v14H4z"/>
+      <path d="M15 3v4h4"/>
+      <path d="M8 12h7M8 16h5"/>
+    </g>
+    <g id="ico-translate">
+      <path d="M3 5h9M7.5 5v-2M10 5c0 4-3 7.5-7 9"/>
+      <path d="M5 9c1.5 2.5 3.5 4.2 6 5"/>
+      <path d="M12 21l4.5-11 4.5 11M13.8 17.5h5.4"/>
+    </g>
+    <g id="ico-mail">
+      <rect x="3" y="5" width="18" height="14" rx="2"/>
+      <path d="m3.8 6.5 8.2 6 8.2-6"/>
+    </g>
+    <g id="ico-meeting">
+      <rect x="3" y="5" width="18" height="16" rx="2"/>
+      <path d="M3 9.5h18M8 3v4M16 3v4"/>
+      <path d="M7.5 13.5h4M7.5 17h7"/>
+    </g>
+    <g id="ico-meal">
+      <path d="M3.5 10.5h13a6.5 6.5 0 0 1-13 0Z"/>
+      <path d="M3.5 20h13"/>
+      <path d="M20.5 3.5v17M18.5 3.5v5a2 2 0 0 0 4 0v-5"/>
+    </g>
+  </defs>
+
+  <rect width="966" height="600" fill="url(#bg)"/>
+  <ellipse cx="880" cy="60" rx="420" ry="300" fill="url(#glow)"/>
+
+  <!-- 워드마크. 실제 로고 파일이 있으면 이 그룹을 통째로 그것으로 바꾼다. -->
+  <g font-family="Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif">
+    <text x="72" y="104" fill="#FFFFFF" font-size="42" font-weight="800" letter-spacing="7">AIONA</text>
+    <rect x="72" y="118" width="58" height="4" rx="2" fill="url(#accent)"/>
+
+    <text x="72" y="190" fill="#FFFFFF" font-size="38" font-weight="700" letter-spacing="-0.6">
+      필요한 작업을 골라 쓰는
+    </text>
+    <text x="72" y="240" fill="#FFFFFF" font-size="38" font-weight="700" letter-spacing="-0.6">
+      AI 작업실
+    </text>
+
+    <text x="72" y="288" fill="#9AA0AB" font-size="17" letter-spacing="-0.2">
+      무엇을 물어볼지 고민하는 대신, 하려는 일에 맞는 카드를 열면 됩니다.
+    </text>
+
+    <!-- 멀티 LLM. 모델 이름을 적지 않는다 — 바뀔 수 있고, 적으면 사실 주장이 된다. -->
+    <g transform="translate(72 314)">
+      <rect x="0" y="0" width="238" height="32" rx="16" fill="#FFFFFF" fill-opacity="0.06" stroke="#FFFFFF" stroke-opacity="0.14"/>
+      <circle cx="22" cy="16" r="3.5" fill="#FFE001"/>
+      <circle cx="33" cy="16" r="3.5" fill="#FFE001" fill-opacity="0.6"/>
+      <circle cx="44" cy="16" r="3.5" fill="#FFE001" fill-opacity="0.3"/>
+      <text x="58" y="21" fill="#D6DAE1" font-size="14" font-weight="600">여러 모델 중에서 선택</text>
+    </g>
+
+    <!-- 작업 카드 6개. 이름은 브랜드 기준표의 기능명과 같아야 한다. -->
+    <g id="cards" stroke-linecap="round" stroke-linejoin="round">
+      <g transform="translate(72 388)">
+        <rect width="272" height="76" rx="16" fill="url(#card)" stroke="#FFFFFF" stroke-opacity="0.09"/>
+        <g transform="translate(24 26)" fill="none" stroke="#FFE001" stroke-width="1.9"><use href="#ico-search"/></g>
+        <text x="70" y="37" fill="#FFFFFF" font-size="17" font-weight="650">자료 조사</text>
+        <text x="70" y="58" fill="#8C939F" font-size="13">알아보고 싶은 것을 대신 찾아 정리</text>
+      </g>
+
+      <g transform="translate(360 388)">
+        <rect width="272" height="76" rx="16" fill="url(#card)" stroke="#FFFFFF" stroke-opacity="0.09"/>
+        <g transform="translate(24 26)" fill="none" stroke="#FFE001" stroke-width="1.9"><use href="#ico-summary"/></g>
+        <text x="70" y="37" fill="#FFFFFF" font-size="17" font-weight="650">문서 요약</text>
+        <text x="70" y="58" fill="#8C939F" font-size="13">긴 자료·뉴스에서 핵심만</text>
+      </g>
+
+      <g transform="translate(648 388)">
+        <rect width="272" height="76" rx="16" fill="url(#card)" stroke="#FFFFFF" stroke-opacity="0.09"/>
+        <g transform="translate(24 26)" fill="none" stroke="#FFE001" stroke-width="1.9"><use href="#ico-translate"/></g>
+        <text x="70" y="37" fill="#FFFFFF" font-size="17" font-weight="650">번역</text>
+        <text x="70" y="58" fill="#8C939F" font-size="13">해외 자료를 그 자리에서</text>
+      </g>
+
+      <g transform="translate(72 480)">
+        <rect width="272" height="76" rx="16" fill="url(#card)" stroke="#FFFFFF" stroke-opacity="0.09"/>
+        <g transform="translate(24 26)" fill="none" stroke="#FFE001" stroke-width="1.9"><use href="#ico-mail"/></g>
+        <text x="70" y="37" fill="#FFFFFF" font-size="17" font-weight="650">이메일·메시지 작성</text>
+        <text x="70" y="58" fill="#8C939F" font-size="13">보내기 전에 한 번 다듬어서</text>
+      </g>
+
+      <g transform="translate(360 480)">
+        <rect width="272" height="76" rx="16" fill="url(#card)" stroke="#FFFFFF" stroke-opacity="0.09"/>
+        <g transform="translate(24 26)" fill="none" stroke="#FFE001" stroke-width="1.9"><use href="#ico-meeting"/></g>
+        <text x="70" y="37" fill="#FFFFFF" font-size="17" font-weight="650">회의 준비</text>
+        <text x="70" y="58" fill="#8C939F" font-size="13">안건과 물어볼 것을 미리</text>
+      </g>
+
+      <g transform="translate(648 480)">
+        <rect width="272" height="76" rx="16" fill="url(#card)" stroke="#FFFFFF" stroke-opacity="0.09"/>
+        <g transform="translate(24 26)" fill="none" stroke="#FFE001" stroke-width="1.9"><use href="#ico-meal"/></g>
+        <text x="70" y="37" fill="#FFFFFF" font-size="17" font-weight="650">주간 식단 짜기</text>
+        <text x="70" y="58" fill="#8C939F" font-size="13">한 주 먹을 것을 한 번에</text>
+      </g>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,64 @@
+# Frontend (React / Vite)
+node_modules/
+dist/
+coverage/
+.vite/
+
+# Backend (Python / FastAPI)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+
+# 작업 계획·리뷰용 설계 문서. 이 PC에만 두고 GitHub에는 올리지 않는다
+# (2026-08-04 사용자 결정). 코드를 읽는 데 필요한 설명은 README와 docs/에 있다.
+Blog-it_개발착수_최종보완안_v2.md
+Blog-it_모듈별_상세_플로우차트_제출본.html
+Blog-it_구조설명_리뷰대비.md
+Blog-it_진행현황_및_다음계획.md
+Blog-it_트렌드관련도_2신호_계획.md
+Blog-it_프롬프트정리.md
+# 발표 준비용 정리본(HTML 원본 + 렌더링한 PDF). 같은 이유로 로컬에만 둔다 —
+# 코드에서 읽어낸 사실을 발표자가 읽으려고 모은 것이고, 저장소의 사실 출처는 코드다.
+Blog-it_발표자료_전체정리.html
+Blog-it_발표자료_전체정리.pdf
+
+# 작업 기록과 작업 규칙도 이 PC에만 둔다(2026-08-12 사용자 결정). 지금까지 올라가 있던
+# 것은 이번 커밋에서 추적 해제했다 — 파일은 로컬에 그대로 있고, 옛 커밋 이력에도 남는다.
+변경내역/
+CLAUDE.md
+
+# Ignore every .env variant, then allow the committed template back in.
+.env
+.env.*
+!.env.example
+
+playwright-report/
+test-results/
+storage-state/
+*.log
+
+# 네이버 로그인 세션. 절대 커밋하지 않는다.
+.naver-profile/
+.naver-profile-users/
+.threads-profile/
+.threads-profile-users/
+
+# 트렌드 키워드 디스크 캐시 (재시작에도 유지). 커밋 대상 아님.
+.trend-cache/
+.job-leases/
+
+# 측정 원자료(전환 전 baseline-*, 전환 후 after-*). 한 번 실행에 수백 KB이고 실행마다 값이
+# 달라져 diff에 의미가 없다. 정리된 수치표는 변경내역과 apps/api/evals/README.md에 남긴다.
+apps/api/evals/baseline-*.json
+apps/api/evals/baseline-*.jsonl
+apps/api/evals/after-*.json
+apps/api/evals/after-*.jsonl
+
+# 로그인 토큰 서명 키. 첫 실행 때 만들어지고, 재시작을 넘겨 로그인을 유지한다.
+# 이 파일을 읽을 수 있으면 토큰을 위조할 수 있으므로 저장소 밖으로 내보내지 않는다.
+.auth-secret
+백업/

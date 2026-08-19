@@ -1,0 +1,4 @@
+# The prompt fixtures are compared byte-for-byte against the string the adapter
+# builds at runtime (apps/api/tests/test_prompt_parity.py). CRLF conversion
+# on checkout would break that comparison on Windows.
+apps/api/tests/fixtures/** -text

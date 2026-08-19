@@ -1,0 +1,36 @@
+fastapi>=0.115
+uvicorn>=0.30
+pydantic>=2.7
+motor>=3.4
+cryptography>=42
+httpx>=0.27
+pypdf>=5.0
+
+# 이미지 모델은 우리 규격(썸네일 1536×864, 본문 1280×720)을 그리지 못하고 한글도 못 쓴다.
+# 생성된 사진을 규격대로 자르고
+# 썸네일 문구를 진짜 텍스트 레이어로 얹는 일은 app/llm/imaging.py가 한다.
+pillow>=10.0
+
+# Korean morphological analysis, used to keep the trend collectors from mining
+# inflected verbs ("되는", "다양한") out of blog and video titles as if they were
+# keywords. Ships as a wheel — no JVM, unlike the older Korean NLP tools.
+kiwipiepy>=0.18
+
+# Trend pool cache. Optional at runtime: without REDIS_URL the cache lives in
+# process memory, which is enough for a single API process.
+redis>=5.0
+
+# Drives 네이버's editor in the user's installed Chrome. The browser profile remains
+# local and Selenium runs in a worker thread so it does not block FastAPI.
+selenium>=4.15
+undetected-chromedriver>=3.5
+# 라이브 뷰(posting/live_view.py): 발행 크롬 화면을 CDP 스크린캐스트로 중계한다.
+# 동기 클라이언트를 쓴다 — 세션마다 리더 스레드 하나가 전부인 모델이라 asyncio가 필요 없다.
+websocket-client>=1.6
+# undetected-chromedriver imports distutils on some Python versions.
+setuptools>=68
+
+# Tests
+pytest>=8.0
+pytest-asyncio>=0.23
+respx>=0.21

@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test *)",
+      "Bash(PYTHONIOENCODING=utf-8 python apps/api/scripts/rotate_email_key.py)",
+      "PowerShell(icacls \"c:\\\\Users\\\\winz\\\\Desktop\\\\winz\\\\Blog-it\\\\.env\")",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_trend_evidence.py -q)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_trend_evidence.py tests/test_material_rotation.py -q)",
+      "Bash(npx vitest *)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_prompt_parity.py -q)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_trend_service.py tests/test_material_rotation.py tests/test_trend_evidence.py -q)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_draft_service.py::TestThumbnailSafetyFallback tests/test_card_pipeline.py -q)",
+      "Bash(python -)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_post_image_generator.py tests/test_card_pipeline.py tests/test_reference_image.py -q)",
+      "Bash(python -c \"from app.shared import ActivityEntry; print\\('import ok'\\)\")",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_blog_task_repository.py tests/test_blog_task_service.py -q)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest \"tests/test_blog_task_repository.py::test_find_status_is_owner_scoped_and_returns_only_polling_fields\" -q)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_blog_task_jobs.py tests/test_blog_task_repository.py tests/test_post_image_generator.py -q)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_blog_task_list_routes.py::test_post_status_is_owner_scoped_and_never_returns_heavy_fields -q)",
+      "Read(//c/Users/winz/.claude/projects/c--Users-winz-Desktop-winz-Blog-it/memory/**)",
+      "Bash(printf -- \"- [확인 질문 금지]\\(no-confirmation-questions.md\\) — \\\\\"할까요?\\\\\"로 턴을 끝내지 말 것, \\\\\"진행해\\\\\"는 직전 미결 사항 실행 지시\\\\n\")",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_card_pipeline.py tests/test_draft_service.py tests/test_blog_task_jobs.py -q)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_card_pipeline.py -q)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest \"tests/test_card_pipeline.py::TestNamedSubjectFallback::test_the_planned_scene_carries_the_identity_fields_to_the_image_input\" -q)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_card_pipeline.py tests/test_draft_service.py -q)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m pytest tests/test_photo_search.py tests/test_card_pipeline.py tests/test_draft_service.py -q)"
+    ]
+  }
+}
