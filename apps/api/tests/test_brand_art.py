@@ -142,11 +142,16 @@ class TestWhenNothingHappens:
 
         assert insert_brand_art(original, [], post_id="post_1") is original
 
-    def test_a_post_with_no_headings_is_untouched(self):
-        """끼울 눈금이 없다. 아무 데나 넣으면 문장 사이에 그림이 떨어진다."""
-        original = post(headings=0)
+    def test_a_post_with_no_headings_still_gets_them(self):
+        """자리가 마땅치 않다고 빼지 않는다 — **항상 두 장**이다(2026-08-20 사용자 지시).
 
-        assert insert_brand_art(original, brand_images(), post_id="post_1") is original
+        소제목이 없으면 문단 중간을 짚을 수 없으니 글 끝에 이어 붙인다. 마무리 블록은
+        그 뒤에 붙으므로 순서는 본문 → 그림 → 안내가 된다.
+        """
+        result = insert_brand_art(post(headings=0), brand_images(), post_id="post_1")
+
+        assert len(result.images or []) == BRAND_ART_COUNT
+        assert result.markdown_content.count("data:image/png") == 2
 
     def test_it_does_not_happen_twice(self):
         once = insert_brand_art(post(), brand_images(), post_id="post_1")
@@ -155,8 +160,12 @@ class TestWhenNothingHappens:
         assert twice is once
         assert has_brand_art(once)
 
-    def test_a_full_image_list_is_respected(self):
-        """이미 사진·표로 상한을 채운 글에 더 밀어 넣지 않는다."""
+    def test_it_does_not_count_against_the_generated_image_budget(self):
+        """마스코트는 **생성 이미지 수와 따로 센다**(2026-08-20 사용자 확인).
+
+        표·그래프가 사진 개수 정책과 따로 세어지는 것과 같다. 상한에 맞춰 자르면 사진이
+        많은 글에서만 마스코트가 조용히 빠져, 글마다 있고 없고가 달라진다.
+        """
         from app.modules.draft.images import MAX_POST_IMAGES
         from app.shared.draft import GeneratedPostImage
 
@@ -176,7 +185,14 @@ class TestWhenNothingHappens:
             ]
         )
 
-        assert insert_brand_art(packed, brand_images(), post_id="post_1") is packed
+        result = insert_brand_art(packed, brand_images(), post_id="post_1")
+
+        assert len(result.images or []) == MAX_POST_IMAGES + BRAND_ART_COUNT
+        # 원래 있던 사진은 하나도 밀려나지 않는다.
+        assert all(
+            f"사진 {n}" in [i.alt_text for i in result.images or []]
+            for n in range(MAX_POST_IMAGES)
+        )
 
 
 @pytest.mark.asyncio
@@ -196,3 +212,33 @@ class TestItRunsAfterTheReview:
         # 마무리는 **맨 끝**이다. 삽화가 그 뒤에 붙으면 안내 아래에 그림이 떨어진다.
         assert final.markdown_content.rstrip().endswith("[aiona.kr](https://aiona.kr)")
         assert final.markdown_content.count("data:image/png") >= 2
+
+
+class TestMascotsAreNotEvidencePhotos:
+    """브랜드 그림이 '이 글 대상의 실물'로 잡히면 안 된다(2026-08-20).
+
+    사용자가 올린 사진은 역할이 붙고(PRODUCT_ANCHOR 등), 이미지 생성이 그것을 보고
+    그리며, 본문에 '사용자 제공 자료' 캡션과 함께 실린다. 마스코트는 그중 어느 것도
+    아니다 — 소재가 '빼빼로'인 글에서 마스코트를 제품 실물로 잡으면 그 그림을 기준으로
+    빼빼로를 그리게 된다.
+
+    기본 브랜드가 마스코트 여덟 장을 싣고 다니므로, 이것은 드문 경우가 아니라 **보통**이다.
+    """
+
+    def test_brand_images_are_left_out_of_the_evidence_list(self):
+        from app.modules.draft.reference_evidence import reference_images
+
+        materials = [
+            *brand_images(),
+            art("내가 찍은 사진", origin=None, data="ZZZZ"),
+        ]
+
+        found = reference_images(materials)
+
+        assert [m.name for m in found] == ["내가 찍은 사진"]
+
+    def test_a_post_with_only_brand_images_has_no_evidence_photos(self):
+        """마스코트만 있는 글은 '올린 사진이 없는 글'과 같아야 한다."""
+        from app.modules.draft.reference_evidence import reference_images
+
+        assert reference_images(brand_images()) == []

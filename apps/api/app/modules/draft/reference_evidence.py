@@ -20,6 +20,7 @@ from __future__ import annotations
 import re
 
 from app.shared import (
+    BRAND_MATERIAL_ORIGIN,
     REFERENCE_IMAGE_ROLES,
     ReferenceEvidenceProfile,
     ReferenceImageEvidence,
@@ -93,10 +94,23 @@ def has_experience_evidence(materials: list[ReferenceMaterial] | None) -> bool:
 
 
 def reference_images(materials: list[ReferenceMaterial] | None) -> list[ReferenceMaterial]:
+    """사용자가 **직접 올린** 사진만. 브랜드가 등록해 둔 그림은 빼고 센다(2026-08-20).
+
+    여기서 나온 목록은 '이 글 대상의 실물'로 다뤄진다 — 역할이 붙고(PRODUCT_ANCHOR 등),
+    이미지 생성이 그것을 보고 그리며, 본문에 '사용자 제공 자료' 캡션과 함께 실린다.
+
+    브랜드 마스코트는 그중 어느 것도 아니다. 소재가 '빼빼로'인 글에서 마스코트를 제품
+    실물로 잡으면 그 그림을 기준으로 빼빼로를 그리게 된다. 기본 브랜드가 마스코트 여덟
+    장을 싣고 다니므로(brand/defaults.py) 이것은 드문 경우가 아니라 **보통**이다.
+
+    브랜드 그림에는 자기 길이 따로 있다 — 본문 삽화는 `draft/brand_art.py`, 맨 끝
+    안내의 그림은 `draft/closing.py`가 넣는다.
+    """
     return [
         material
         for material in (materials or [])
         if material.type == ReferenceMaterialType.IMAGE
+        and material.origin != BRAND_MATERIAL_ORIGIN
     ]
 
 

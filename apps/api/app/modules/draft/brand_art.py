@@ -37,7 +37,6 @@ from app.shared.draft import GeneratedPostImage
 from app.shared.format import now_iso
 
 from .images import (
-    MAX_POST_IMAGES,
     dedupe_images,
     image_html,
     image_markdown,
@@ -139,9 +138,13 @@ def insert_brand_art(
     if not available:
         return post
 
-    # 이미지 상한을 넘기지 않는다. 이미 사진·표가 채워져 있으면 그만큼만 넣는다.
-    room = MAX_POST_IMAGES - len(post.images or [])
-    picks = min(count, len(available), max(room, 0))
+    # **생성 이미지 수에 잡히지 않는다**(2026-08-20 사용자 확인). 표·그래프가 사진 개수
+    # 정책과 따로 세어지는 것과 같다 — 이 그림은 모델이 만든 것이 아니라 브랜드가 늘
+    # 들고 다니는 세간이라, 사진을 몇 장 넣을지 정하는 계산에 끼면 안 된다.
+    #
+    # 그래서 목록 상한(MAX_POST_IMAGES)에서도 빼지 않고 **얹는다.** 상한에 맞춰 자르면
+    # 사진이 많은 글에서만 마스코트가 조용히 빠져, 글마다 있고 없고가 달라진다.
+    picks = min(count, len(available))
     if picks <= 0:
         return post
 
@@ -152,16 +155,22 @@ def insert_brand_art(
     markdown = post.markdown_content or f"# {post.title}\n\n{post.body}"
     html = post.html_content or ""
     total_headings = _headings(markdown)
-    if total_headings == 0:
-        # 소제목이 없는 글이다. 끼울 눈금이 없으므로 넣지 않는다 — 아무 데나 넣으면
-        # 문장 사이에 그림이 떨어진다.
-        return post
 
-    # 두 장을 앞뒤로 갈라 놓는다. 소제목이 넷이면 2번과 4번 아래가 된다.
-    for index, image in enumerate(images):
-        section = round(total_headings * (index + 1) / (len(images) + 1)) or 1
-        markdown = insert_after_heading_markdown(markdown, section, image_markdown(image))
-        html = insert_after_heading_html(html, section, image_html(image))
+    if total_headings:
+        # 두 장을 앞뒤로 갈라 놓는다. 소제목이 넷이면 2번과 4번 아래가 된다.
+        for index, image in enumerate(images):
+            section = round(total_headings * (index + 1) / (len(images) + 1)) or 1
+            markdown = insert_after_heading_markdown(markdown, section, image_markdown(image))
+            html = insert_after_heading_html(html, section, image_html(image))
+    else:
+        # 소제목이 없는 글. 끼울 눈금이 없어도 **그림은 들어간다**(2026-08-20 사용자
+        # 지시: 항상 두 장). 문단 중간을 짚을 수 없으니 글 끝에 이어 붙인다 — 마무리
+        # 블록은 이 뒤에 붙으므로 순서는 본문 → 그림 → 안내가 된다.
+        gap = "\n\n"
+        markdown = markdown.rstrip() + gap + gap.join(
+            image_markdown(image) for image in images
+        )
+        html = html.rstrip() + "".join(image_html(image) for image in images)
 
     return post.model_copy(
         update={
@@ -171,7 +180,8 @@ def insert_brand_art(
             else f'<div {BRAND_ART_MARKER}></div>{html}',
             "markdown_content": markdown,
             # 발행 경로가 이 목록을 보고 data URL을 실제 주소로 바꾼다. 목록에 없으면
-            # 네이버에서 그림이 빠진다.
-            "images": dedupe_images([*(post.images or []), *images])[:MAX_POST_IMAGES],
+            # 네이버에서 그림이 빠진다. 여기서 자르지 않는 이유는 위와 같다 — 이 두 장은
+            # 생성 이미지 수와 따로 센다.
+            "images": dedupe_images([*(post.images or []), *images]),
         }
     )

@@ -700,4 +700,79 @@ describe("StepTrends 여러 편 라운드", () => {
     expect(cta?.disabled).toBe(false);
     expect(cta?.textContent).toContain("작성 전 검증으로");
   });
+  /**
+   * 브랜드를 얹은 글은 **소재 관련순만** 쓴다(2026-08-20 사용자 지시).
+   *
+   * 최신순은 소재와 무관한 실시간 인기 검색어다. 브랜드 글에 그것을 붙이면 소재도
+   * 브랜드도 아닌 제3의 키워드가 제목의 중심이 되어, 소재를 검색한 사람이 들어올
+   * 길이 사라진다.
+   */
+  describe("브랜드를 얹은 글", () => {
+    const WITH_BRAND: BlogTask = {
+      ...TASK,
+      input: { ...TASK.input, brandId: "brand_aiona", brandName: "AIONA" },
+    };
+
+    it("보기 방식 탭을 감추고 무엇을 보여 주는지 말한다", async () => {
+      mocks.store.task = WITH_BRAND;
+      mocks.store.recommendation = null;
+      await render();
+
+      expect(container.querySelector(".title-trend-tabs")).toBeNull();
+      expect(container.querySelector(".title-trend-fixed-note")?.textContent).toContain(
+        "소재 관련순",
+      );
+      expect(container.querySelector(".title-trend-fixed-note")?.textContent).toContain(
+        "실시간 인기 검색어는 제외",
+      );
+    });
+
+    it("store에 최신순이 남아 있어도 소재 관련순으로 불러온다", async () => {
+      // 브랜드 없는 글을 쓰다가 브랜드 글로 옮겨오면 store에 '최신순'이 남아 있다.
+      mocks.store.task = WITH_BRAND;
+      mocks.store.trendMode = "TRENDING";
+      // 목록이 비어 있어야 화면이 실제로 불러온다 — 이미 있으면 요청이 없어 무엇으로
+      // 불렀는지 볼 수 없다.
+      mocks.store.recommendation = null;
+      await render();
+
+      expect(mocks.store.setTrendMode).toHaveBeenCalledWith("MATERIAL_RELATED");
+      // 보기 방식은 요청 **본문**으로 간다. 최신순으로 한 번이라도 불렀다면 소재와
+      // 무관한 실시간 인기 검색어가 화면에 남는다.
+      const modes = mocks.request.mock.calls
+        .map(([, options]) => (options as { body?: { mode?: string } })?.body?.mode)
+        .filter(Boolean);
+      expect(modes.length).toBeGreaterThan(0);
+      expect(modes.every((value) => value === "MATERIAL_RELATED")).toBe(true);
+    });
+
+    it("관련 키워드가 없어도 최신순으로 넘어갈 길을 주지 않는다", async () => {
+      // 그 목록은 소재와 무관한 실시간 인기 검색어다. 여기서 열어 주면 탭을 감춘 것이
+      // 무의미해진다 — 나가는 문이 하나 더 있는 셈이다.
+      mocks.store.task = WITH_BRAND;
+      mocks.store.trendMode = "MATERIAL_RELATED";
+      mocks.store.recommendation = null;
+      mocks.request.mockResolvedValue(
+        recommendation({ mode: "MATERIAL_RELATED", trendKeywords: [] }),
+      );
+      await render();
+
+      const empty = container.querySelector(".title-empty-state");
+      expect(empty).not.toBeNull();
+      expect(empty?.textContent).not.toContain("최신순");
+      const actions = [...container.querySelectorAll(".title-empty-actions button")].map(
+        (node) => node.textContent?.trim(),
+      );
+      expect(actions).not.toContain("최신순으로 보기");
+    });
+
+    it("브랜드가 없으면 탭은 그대로 있다", async () => {
+      mocks.store.task = TASK;
+      mocks.store.recommendation = null;
+      await render();
+
+      expect(container.querySelector(".title-trend-tabs")).not.toBeNull();
+      expect(container.querySelector(".title-trend-fixed-note")).toBeNull();
+    });
+  });
 });

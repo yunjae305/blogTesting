@@ -119,7 +119,26 @@ export function StepTrends({
   // 지금 어느 보기인지는 **store가 들고 있다**(이 화면의 지역 상태가 아니다). 목록
   // (recommendation)도 store에 있어서, 여기에만 두면 소재 단계에 다녀오는 것만으로 탭이
   // '최신순'으로 되돌아가고 카드는 소재 관련순 그대로 남았다(2026-08-11 사용자 신고).
-  const mode = trendMode;
+  /**
+   * 브랜드를 얹은 글은 **소재 관련순만** 쓴다(2026-08-20 사용자 지시).
+   *
+   * 최신순은 소재와 무관한 실시간 인기 검색어다. 그것을 브랜드 글에 붙이면 소재도
+   * 브랜드도 아닌 제3의 키워드가 제목의 중심이 되어, 글이 어디로도 닿지 않는다 —
+   * 이 글의 목적은 **소재를 검색한 사람**을 데려오는 것이다.
+   *
+   * 탭 자체를 감춘다. 눌러 봐야 쓸 수 없는 탭을 남겨 두면 무엇을 고르라는 것인지
+   * 알 수 없다.
+   */
+  const brandPicked = Boolean(task?.input?.brandId);
+  const mode: TrendMode = brandPicked ? "MATERIAL_RELATED" : trendMode;
+
+  // store의 보기 방식도 맞춰 둔다. 화면만 바꾸면 소재 단계에 다녀오거나 브랜드를 뺐을 때
+  // store에 남아 있던 '최신순'이 되살아나, 방금 본 목록과 탭이 어긋난다.
+  useEffect(() => {
+    if (brandPicked && trendMode !== "MATERIAL_RELATED") {
+      setTrendMode("MATERIAL_RELATED");
+    }
+  }, [brandPicked, setTrendMode, trendMode]);
   const recByMode = useRef<Partial<Record<TrendMode, TrendRecommendation>>>({});
   // 수집 진행 상태. busy와 분리한 이유: 수집은 탭 전환이나 다른 UI를 막지 않는 백그라운드
   // 작업이라서다 — 로딩 중에도 최신순으로 돌아갔다가 다시 오면 끝난 결과를 즉시 본다.
@@ -554,8 +573,12 @@ export function StepTrends({
     <section className="panel write-paper-card title-step" aria-label="제목 단계">
       <header className="panel-header title-step-head">
         <div className="panel-heading-copy">
-          <p className="panel-kicker">STEP {String(WRITE_STEP.TITLE + 1).padStart(2, "0")} · REALTIME TREND</p>
-          <h2 className="panel-title">트렌드 키워드 선택</h2>
+          {/* 브랜드를 얹은 글은 실시간 트렌드를 쓰지 않는다 — 그 글에서 이 글자는 사실이 아니다. */}
+          <p className="panel-kicker">
+            STEP {String(WRITE_STEP.TITLE + 1).padStart(2, "0")} ·{" "}
+            {brandPicked ? "TOPIC KEYWORD" : "REALTIME TREND"}
+          </p>
+          <h2 className="panel-title">키워드 선택</h2>
           {/* 수집 상태·시각 한 줄. '실제 갱신 여부'(불러오는 중 / 최신 표시 / 저장분 표시)와
               마지막으로 데이터를 가져온 시각을 함께 보여준다. */}
           <p className="title-step-meta">
@@ -623,15 +646,26 @@ export function StepTrends({
             disabled={!selectionAllowed || !!busy}
             onClick={skipTrend}
           >
-            트렌드 없이 소재만으로 작성
+            소재만으로 작성
           </button>
           <p className="title-action-note">
-            트렌드 키워드 없이 입력한 소재만으로 제목을 만들 수도 있습니다.
+            키워드 없이 입력한 소재만으로 제목을 만들 수도 있습니다.
           </p>
         </div>
 
         {/* 두 보기 방식(최신순/소재 관련순)은 서로 다른 후보 풀을 불러온다 — 정렬 토글이
-            아니라 모드 전환이다. 카드를 고른 뒤에도 감추지 않고 언제든 전환할 수 있게 둔다. */}
+            아니라 모드 전환이다. 카드를 고른 뒤에도 감추지 않고 언제든 전환할 수 있게 둔다.
+
+            브랜드를 얹은 글에서는 고를 것이 없다: 최신순은 소재와 무관한 실시간 인기
+            검색어라 그 글에 쓸 수 없다(2026-08-20). 탭 대신 무엇을 보여 주고 있는지
+            한 줄로 말한다. */}
+        {brandPicked ? (
+          <p className="title-trend-fixed-note">
+            <strong>소재 관련순</strong>으로만 보여 드립니다. 브랜드를 함께 쓰는 글은
+            소재를 검색한 사람이 들어와야 하므로, 소재와 무관한 실시간 인기 검색어는
+            제외합니다.
+          </p>
+        ) : (
         <div className="title-trend-tabs" role="tablist" aria-label="트렌드 보기 방식">
           {/* 탭은 어떤 상황에도 disabled 하지 않는다 — 로딩 중에도 자유롭게 오갈 수 있고,
               수집은 백그라운드에서 계속된다. */}
@@ -653,9 +687,12 @@ export function StepTrends({
             </button>
           ))}
         </div>
+        )}
 
         {/* 두 탭의 설명은 활성 여부와 상관없이 늘 함께 보여준다 — 무엇이 다른 기능인지
-            눌러보지 않고도 비교할 수 있어야 한다. */}
+            눌러보지 않고도 비교할 수 있어야 한다. 고를 것이 없는 브랜드 글에서는 비교할
+            것도 없으므로 함께 감춘다. */}
+        {!brandPicked && (
         <div className="title-trend-tab-notes" aria-hidden="true">
           {TREND_MODE_BUTTONS.map((option) => (
             <p key={option.id} className={mode === option.id ? "current" : ""}>
@@ -663,6 +700,7 @@ export function StepTrends({
             </p>
           ))}
         </div>
+        )}
 
         <div
           className="title-trend-panel"
@@ -866,8 +904,9 @@ export function StepTrends({
               <div className="title-empty-state">
                 <p>
                   저장된 후보와 새로 수집한 키워드 모두에서 소재와 관련된 키워드를 찾지 못했습니다.
-                  '최신순'에서 지금 뜨는 트렌드를 골라 소재와 연결하거나, 트렌드 없이 소재만으로
-                  작성할 수 있습니다.
+                  {brandPicked
+                    ? " 소재만으로도 제목을 만들 수 있습니다."
+                    : " '최신순'에서 지금 뜨는 키워드를 골라 소재와 연결하거나, 키워드 없이 소재만으로 작성할 수 있습니다."}
                 </p>
                 <div className="title-empty-actions">
                   {/* 수집 실패·일시 오류일 수 있으므로 재시도 길을 함께 둔다 — 로딩이 무한히
@@ -880,14 +919,19 @@ export function StepTrends({
                   >
                     다시 확인
                   </button>
-                  <button
-                    className="button small title-keyword-action"
-                    type="button"
-                    onClick={() => switchMode("TRENDING")}
-                    disabled={!!busy}
-                  >
-                    최신순으로 보기
-                  </button>
+                  {/* 브랜드를 얹은 글에는 최신순으로 넘어갈 길을 주지 않는다(2026-08-20).
+                      그 목록은 소재와 무관한 실시간 인기 검색어라, 여기서 열어 주면 위에서
+                      탭을 감춘 것이 무의미해진다 — 나가는 문이 하나 더 있는 셈이다. */}
+                  {!brandPicked && (
+                    <button
+                      className="button small title-keyword-action"
+                      type="button"
+                      onClick={() => switchMode("TRENDING")}
+                      disabled={!!busy}
+                    >
+                      최신순으로 보기
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -992,7 +1036,7 @@ export function StepTrends({
                   ? "선택한 트렌드 키워드로 제목을 쓰는 중입니다."
                   : selectedKeyword
                     ? `'${selectedKeyword.keyword}' 트렌드 키워드로 제목을 만들려면 제목 추천을 눌러주세요.`
-                    : "트렌드 키워드를 하나 고른 뒤 제목 추천을 눌러주세요. 트렌드 없이 소재만으로 작성할 수도 있습니다."}
+                    : "키워드를 하나 고른 뒤 제목 추천을 눌러주세요. 키워드 없이 소재만으로 작성할 수도 있습니다."}
             </p>
           )}
         </div>

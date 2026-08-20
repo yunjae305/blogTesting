@@ -28,6 +28,9 @@
 했다. 기능 이름은 줄이지 않았다 — 글에 그대로 나가야 하는 글자다.
 """
 
+import base64
+from pathlib import Path
+
 from app.shared import BrandLimits
 
 #: 사람마다 같은 값. 두 요청이 동시에 만들어도 문서가 두 벌이 되지 않게 하는 장치다.
@@ -253,15 +256,66 @@ LINKS: list[dict] = [
     {"label": "AIONA 조직·기업 도입 안내", "url": "https://aiona.kr/business"},
 ]
 
+#: 마스코트 그림. **상황별로 여덟 장**이고, 이름이 곧 그 상황이다.
+#:
+#: 파일로 두고 여기서 읽는다. base64를 이 파일에 적어 두면 소스가 수십만 자로 불어나
+#: 사람이 읽을 수 없게 되고, 그림 한 장을 바꿀 때마다 diff가 통째로 뒤집힌다.
+#:
+#: **PNG로 둔다.** 원본은 SVG인데, 네이버 에디터는 붙여넣는 이미지를 자기 서버로 가져가
+#: 다시 저장하고 그 경로가 SVG를 받아 준다는 보장이 없다. 평면 일러스트라 480px PNG로도
+#: 선이 살고, 한 장이 15KB 안쪽이라 열 장을 다 넣어도 상한(합계 10MB)에 한참 못 미친다.
+#:
+#: 쓰임(caption)은 그림 시트에 적혀 있던 그대로다. 이 글자가 원고 프롬프트로도 가므로,
+#: 지어내지 않고 옮겨 적기만 한다.
+_ART_DIR = Path(__file__).parent / "assets"
+
+MASCOTS: list[tuple[str, str, str]] = [
+    ("aio-base.png", "기본", "프로필·공용"),
+    ("aio-wave.png", "인사", "포스팅 도입부·첫 글"),
+    ("aio-point.png", "안내", "기능 설명·섹션 유도"),
+    ("aio-search.png", "조사", "검색·비교·리서치"),
+    ("aio-report.png", "결과 전달", "보고서·주간 리포트"),
+    ("aio-pdf.png", "자료 건네기", "지식 업로드·문서 요약"),
+    ("aio-think.png", "고민", "문제 제기·질문형 도입"),
+    ("aio-celebrate.png", "축하", "마무리·성과 공유"),
+]
+
+
+def mascot_images() -> list[dict]:
+    """마스코트 그림을 브랜드 자료의 이미지 목록 모양으로.
+
+    파일이 없으면 그 장만 조용히 건너뛴다 — 그림 한 장 때문에 브랜드 자료 전체가
+    만들어지지 않으면, 새 계정이 브랜드 없이 시작하게 된다.
+    """
+    images: list[dict] = []
+    for filename, label, _usage in MASCOTS:
+        path = _ART_DIR / filename
+        if not path.is_file():
+            continue
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+        images.append(
+            {
+                "label": label,
+                "dataUrl": f"data:image/png;base64,{encoded}",
+                # 캡션이 곧 이름표다. 마무리 블록이 이 이름으로 그림을 찾고
+                # (`BrandClosing.image_label`), 본문 삽화의 대체텍스트도 이것이다.
+                # 쓰임(usage)은 위 표에만 적어 둔다 — 사람이 그림을 고를 때 읽는 것이지
+                # 글에 실리는 값이 아니다.
+                "caption": label,
+            }
+        )
+    return images
+
+
 #: 글 맨 마지막에 언제나 붙는 마무리. **검수를 거치지 않고 그대로 발행되는 글자다.**
 #: 크레딧 수·가입 조건은 사실이므로 바뀌면 여기서 고친다.
 CLOSING: dict = {
     "note": "가입은 무료, 웰컴 크레딧 100 지급, 카드 등록 없음.",
     "label": "aiona.kr",
     "url": "https://aiona.kr",
-    # 마스코트 이미지는 사용자가 브랜드 자료 편집 화면에서 올린다. 그때 캡션을 이 이름으로
-    # 맞추면 마무리에 함께 붙는다 — 없으면 글자만 붙는다.
-    "imageLabel": "AIONA 마스코트",
+    # 마무리에 함께 붙일 그림. 아래 MASCOTS의 이름 중 하나여야 한다 — 이름이 어긋나면
+    # 글자만 붙는다(글이 깨지지는 않는다).
+    "imageLabel": "축하",
 }
 
 
@@ -275,6 +329,7 @@ def default_brand_body() -> dict:
         "audiences": AUDIENCES,
         "links": LINKS,
         "closing": CLOSING,
+        "images": mascot_images(),
     }
 
 
