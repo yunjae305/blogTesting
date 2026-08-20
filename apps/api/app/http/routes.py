@@ -262,22 +262,6 @@ async def update_brand(request: Request, brand_id: str) -> JSONResponse:
     return bare(brand.to_wire())
 
 
-@router.post("/brands/{brand_id}/read-site")
-async def read_brand_site(request: Request, brand_id: str) -> JSONResponse:
-    """브랜드의 자기 사이트를 읽어 자료를 **제안**한다(2026-08-20 사용자 결정).
-
-    **저장하지 않는다.** 편집 화면의 칸을 채워 줄 뿐이고, 저장은 사람이 보고 누른다 —
-    사이트가 말하지 않는 기능 이름이 있기 때문이다(BrandService.read_site 참고).
-
-    주소를 주지 않으면 브랜드에 등록된 주소를 읽는다. 로그인 뒤에 있어 서버가 못 여는
-    페이지는 `text`로 붙여넣으면 같은 길로 흐른다.
-    """
-    user = await _authenticate(request)
-    body = await _json_body(request)
-    proposed = await _services(request).brand_service.read_site(user.user_id, brand_id, body)
-    return bare(proposed)
-
-
 @router.post("/brands/{brand_id}/read-feature")
 async def read_brand_feature(request: Request, brand_id: str) -> JSONResponse:
     """신기능 페이지(또는 붙여넣은 공지)를 읽어 **글의 출발점**으로 바꾼다.

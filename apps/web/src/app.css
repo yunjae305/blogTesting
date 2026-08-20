@@ -14131,38 +14131,6 @@ button.scheduled-check:disabled {
   resize: vertical;
 }
 
-/* 사이트에서 자료 가져오기(2026-08-20). 자료 칸 사이에 서므로 테두리로 묶어
-   '여기서부터는 다른 일'이라고 알린다 — 아래 칸들은 손으로 적는 곳이고 여기는 채워
-   주는 곳이다. */
-.brand-site-import {
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: var(--surface-muted, transparent);
-}
-
-.brand-site-import-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.brand-site-import-head .brand-field-label {
-  margin: 0;
-}
-
-.brand-site-import input,
-.brand-site-import textarea {
-  min-width: 0;
-  width: 100%;
-  font: inherit;
-}
-
-.brand-site-import textarea {
-  resize: vertical;
-}
-
 .brand-closing-row {
   display: grid;
   grid-template-columns: minmax(0, 0.6fr) minmax(0, 1fr);

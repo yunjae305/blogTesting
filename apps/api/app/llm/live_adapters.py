@@ -42,7 +42,6 @@ from .naver_blog import to_mobile_url
 from .source_quality import drop_blocked_sources
 from .keyword_naturalization import primary_raw_keyword
 from .contracts import (
-    BrandDraft,
     FeatureBrief,
     KeywordJudgment,
     KeywordRelevanceInput,
@@ -108,7 +107,6 @@ from .schemas import (
     RELATION_TYPES,
     RELEVANCE_SCHEMA,
     DRAFT_SCHEMA,
-    GEMINI_BRAND_IMPORT_SCHEMA,
     GEMINI_FEATURE_BRIEF_SCHEMA,
     GEMINI_INTENT_SCHEMA,
     TITLE_EVALUATION_SCHEMA,
@@ -120,8 +118,6 @@ from .schemas import (
     WEB_PHOTO_GATE_SCHEMA,
 )
 from app.shared import (
-    BrandLink,
-    BrandUseCase,
     ContentPlan,
     FinalReviewReport,
     EditorialStylePlan,
@@ -1552,49 +1548,6 @@ class GeminiSiteReader:
             },
         )
         return extract_json_object(extract_gemini_text(payload))
-
-    async def read_brand(self, site_input: SiteReadInput) -> BrandDraft:
-        research, read, failed = await self._read(site_input)
-        parsed = await self._structure(
-            prompts.brand_import_prompt(site_input.brand_name, research),
-            GEMINI_BRAND_IMPORT_SCHEMA,
-        )
-
-        use_cases: list[BrandUseCase] = []
-        for item in parsed.get("useCases") or []:
-            if not isinstance(item, dict):
-                continue
-            situation = string_value(item.get("situation")).strip()
-            feature = string_value(item.get("feature")).strip()
-            # 한 칸만 채운 줄은 프롬프트에 반쪽짜리 지시로 실린다. 저장 검증도 같은 것을
-            # 버리므로 여기서 먼저 버려 화면이 헛것을 보여 주지 않게 한다.
-            if not situation or not feature:
-                continue
-            use_cases.append(
-                BrandUseCase(
-                    situation=situation,
-                    feature=feature,
-                    keywords=string_array(item.get("keywords")),
-                )
-            )
-
-        links: list[BrandLink] = []
-        for item in parsed.get("links") or []:
-            if not isinstance(item, dict):
-                continue
-            url = string_value(item.get("url")).strip()
-            if not url or not is_public_reference_url(url):
-                continue
-            links.append(BrandLink(label=string_value(item.get("label")).strip(), url=url))
-
-        return BrandDraft(
-            description=string_value(parsed.get("description")).strip(),
-            features=string_value(parsed.get("features")).strip(),
-            use_cases=use_cases,
-            links=links,
-            read_urls=read,
-            failed_urls=failed,
-        )
 
     async def read_feature(self, site_input: SiteReadInput) -> FeatureBrief:
         research, read, _failed = await self._read(site_input)

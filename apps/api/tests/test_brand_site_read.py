@@ -1,40 +1,37 @@
-"""브랜드 사이트를 읽어 자료를 채운다(2026-08-20 사용자 결정).
+"""신기능 페이지를 읽어 **글의 소재**로 만든다(2026-08-20 사용자 결정).
 
-> "지금처럼 직접 정보를 채워넣어서 저장해두는 형태가 아니고 브랜드 글 쓰기를 하면
->  너가 aiona 홈페이지 링크를 타고 들어가서 정보를 찾고 글을 쓰는 거지."
+> "신기능이 나오면 그것에 대한 글을 생성하는거고."
 
-**저장하지는 않는다.** 읽어 온 것은 제안이고 사람이 확인하고 누른다. 사이트가 말하지
-않는 기능 이름이 있기 때문이다 — aiona.kr 첫 화면은 큰 기능 여섯 개만 말하는데 기준표에는
-스물여덟 줄이 있다. 통째로 덮으면 그 이름들이 사라지고, 모델은 없어진 이름 대신 지어낸다.
+이 칸이 있기 전에는 신기능 글을 쓰려면 기능 이름을 사람이 알고 정확히 적어야 했다.
+브랜드 자료가 아직 그 기능을 모르면(새로 나왔으니 당연하다) 모델이 이름을 지어내거나
+옛 기능으로 대신 썼다. 페이지를 읽어 **적힌 이름 그대로** 소재에 넣으면 그 둘이 함께
+없어진다.
+
+붙여넣기 통로가 함께 있는 이유: AIONA 업데이트 공지는 공개 주소로 열어도 목록이
+로그인 뒤에만 보인다(`aiona.kr/announcements` HTML 안의 "전체 공지사항은 로그인 후
+확인할 수 있습니다"). 그때는 공지 내용을 복사해 넣으면 같은 길로 흐른다.
 """
 
 import pytest
 
 from app.errors import BlogTaskError
-from app.llm import BrandDraft, FeatureBrief, SiteReadInput
+from app.llm import FeatureBrief, SiteReadInput
 from app.modules.brand import (
     DEFAULT_BRAND_ID,
     BrandService,
     InMemoryBrandRepository,
 )
 from app.modules.brand.validation import MAX_SITE_READ_URLS, validate_site_read_body
-from app.shared import BrandLink, BrandProfile, BrandUseCase
+from app.shared import BrandLink, BrandProfile
 
 
 class FakeReader:
     """읽어 온 척한다. 무엇을 받았는지 기록해 둔다."""
 
-    def __init__(self, brand=None, feature=None, error=None):
-        self.brand = brand or BrandDraft()
+    def __init__(self, feature=None, error=None):
         self.feature = feature or FeatureBrief(name="앱스튜디오")
         self.error = error
         self.seen: list[SiteReadInput] = []
-
-    async def read_brand(self, site_input: SiteReadInput) -> BrandDraft:
-        self.seen.append(site_input)
-        if self.error:
-            raise self.error
-        return self.brand
 
     async def read_feature(self, site_input: SiteReadInput) -> FeatureBrief:
         self.seen.append(site_input)
@@ -44,8 +41,7 @@ class FakeReader:
 
 
 async def service_with(reader) -> BrandService:
-    repository = InMemoryBrandRepository()
-    service = BrandService(repository, site_reader=reader)
+    service = BrandService(InMemoryBrandRepository(), site_reader=reader)
     await service.ensure_default_brands("user_1")
     return service
 
@@ -90,7 +86,7 @@ class TestWhatGetsRead:
         assert "읽을 수 없는 주소" in caught.value.message
 
     def test_nothing_to_read_is_refused(self):
-        """조용히 빈 제안을 돌려주면 화면은 '사이트에 아무것도 없다'로 읽는다."""
+        """조용히 빈 제안을 돌려주면 화면은 '페이지에 아무것도 없다'로 읽는다."""
         with pytest.raises(BlogTaskError):
             validate_site_read_body({}, profile())
 
@@ -100,63 +96,6 @@ class TestWhatGetsRead:
         )
 
         assert len(urls) == MAX_SITE_READ_URLS
-
-
-@pytest.mark.asyncio
-class TestReadingTheSite:
-    async def test_it_proposes_without_saving(self):
-        """읽은 것이 곧바로 저장되면, 사이트에 없는 기능 이름이 조용히 사라진다."""
-        reader = FakeReader(
-            brand=BrandDraft(
-                description="통합 AI 업무 플랫폼입니다.",
-                features="AI 채팅, 앱스튜디오",
-                use_cases=[
-                    BrandUseCase(situation="앱을 만들고 싶을 때", feature="앱스튜디오", keywords=[])
-                ],
-                read_urls=["https://aiona.kr"],
-            )
-        )
-        service = await service_with(reader)
-
-        proposed = await service.read_site("user_1", DEFAULT_BRAND_ID, {})
-
-        assert proposed["description"] == "통합 AI 업무 플랫폼입니다."
-        assert proposed["useCases"][0]["feature"] == "앱스튜디오"
-        # 저장은 일어나지 않았다 — 기준표는 기본값 그대로다.
-        saved = await service.get_brand("user_1", DEFAULT_BRAND_ID)
-        assert len(saved.use_cases) > 1
-        assert saved.description != "통합 AI 업무 플랫폼입니다."
-
-    async def test_it_reads_the_brands_registered_links(self):
-        reader = FakeReader()
-        service = await service_with(reader)
-
-        await service.read_site("user_1", DEFAULT_BRAND_ID, {})
-
-        assert "https://aiona.kr" in reader.seen[0].urls
-        assert reader.seen[0].brand_name == "AIONA"
-
-    async def test_a_failure_says_what_to_do_next(self):
-        """provider 이름·상태코드를 화면에 띄우지 않는다. 다음에 할 일을 말한다."""
-        service = await service_with(FakeReader(error=RuntimeError("gemini 503")))
-
-        with pytest.raises(BlogTaskError) as caught:
-            await service.read_site("user_1", DEFAULT_BRAND_ID, {})
-
-        assert caught.value.code == "SITE_READ_FAILED"
-        assert "gemini" not in caught.value.message
-        assert "붙여넣어" in caught.value.message
-
-    async def test_it_says_so_when_the_reader_is_off(self):
-        """자격 증명이 없는 서버에서도 나머지는 그대로 돌아야 한다."""
-        repository = InMemoryBrandRepository()
-        service = BrandService(repository)
-        await service.ensure_default_brands("user_1")
-
-        with pytest.raises(BlogTaskError) as caught:
-            await service.read_site("user_1", DEFAULT_BRAND_ID, {})
-
-        assert caught.value.code == "SITE_READER_UNAVAILABLE"
 
 
 @pytest.mark.asyncio
@@ -180,14 +119,44 @@ class TestReadingOneNewFeature:
         assert brief["name"] == "리서치 코파일럿"
         assert brief["keywords"] == ["논문", "학술"]
 
+    async def test_it_reads_as_this_brand(self):
+        """'이 사이트가 무엇을 파는 곳인가'가 아니라 '이 브랜드에 대해 뭐라 하는가'다."""
+        reader = FakeReader()
+        service = await service_with(reader)
+
+        await service.read_feature(
+            "user_1", DEFAULT_BRAND_ID, {"urls": ["https://aiona.kr/research"]}
+        )
+
+        assert reader.seen[0].brand_name == "AIONA"
+
     async def test_pasted_announcements_work_without_a_url(self):
         """AIONA 공지 목록은 공개 주소로 열어도 로그인 뒤에만 보인다."""
-        reader = FakeReader(feature=FeatureBrief(name="앱스튜디오"))
-        service = await service_with(reader)
+        service = await service_with(FakeReader())
 
         await service.read_feature(
             "user_1", DEFAULT_BRAND_ID, {"text": "이번 업데이트로 앱스튜디오가 열렸습니다."}
         )
 
-        assert reader.seen[0].urls == []
-        assert "앱스튜디오" in reader.seen[0].text
+        assert "앱스튜디오" in service._site_reader.seen[0].text
+
+    async def test_a_failure_says_what_to_do_next(self):
+        """provider 이름·상태코드를 화면에 띄우지 않는다. 다음에 할 일을 말한다."""
+        service = await service_with(FakeReader(error=RuntimeError("gemini 503")))
+
+        with pytest.raises(BlogTaskError) as caught:
+            await service.read_feature("user_1", DEFAULT_BRAND_ID, {"text": "공지"})
+
+        assert caught.value.code == "SITE_READ_FAILED"
+        assert "gemini" not in caught.value.message
+        assert "붙여넣어" in caught.value.message
+
+    async def test_it_says_so_when_the_reader_is_off(self):
+        """자격 증명이 없는 서버에서도 나머지는 그대로 돌아야 한다."""
+        service = BrandService(InMemoryBrandRepository())
+        await service.ensure_default_brands("user_1")
+
+        with pytest.raises(BlogTaskError) as caught:
+            await service.read_feature("user_1", DEFAULT_BRAND_ID, {"text": "공지"})
+
+        assert caught.value.code == "SITE_READER_UNAVAILABLE"

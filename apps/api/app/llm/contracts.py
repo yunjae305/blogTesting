@@ -7,8 +7,6 @@ from pydantic import Field, model_validator
 from app.shared import (
     normalized_subject_fields,
     BlogTaskInput,
-    BrandLink,
-    BrandUseCase,
     CamelModel,
     CardBrief,
     CardDesignSystem,
@@ -379,22 +377,6 @@ class SiteReadInput(CamelModel):
     text: str = ""
 
 
-class BrandDraft(CamelModel):
-    """사이트에서 읽어 낸 브랜드 자료 **제안**. 저장 모양(`validate_brand_body`)과 같다.
-
-    비어 있는 칸은 "사이트에서 못 찾았다"는 뜻이다. 화면은 채워진 칸만 덮어쓴다 —
-    못 찾은 것으로 이미 있는 자료를 지우면 안 된다.
-    """
-
-    description: str = ""
-    features: str = ""
-    use_cases: list[BrandUseCase] = []
-    links: list[BrandLink] = []
-    #: 실제로 읽힌 주소와 못 읽은 주소. 화면이 "무엇을 보고 채웠는지" 보여 줄 근거다.
-    read_urls: list[str] = []
-    failed_urls: list[str] = []
-
-
 class FeatureBrief(CamelModel):
     """신기능 한 가지를 소개하는 글의 출발점(2026-08-20).
 
@@ -415,7 +397,5 @@ class FeatureBrief(CamelModel):
 
 class SiteReader(Protocol):
     """브랜드 사이트를 읽는 쪽. 없으면(자격 증명 없음) 화면이 '지금은 못 쓴다'고 알린다."""
-
-    async def read_brand(self, input: SiteReadInput) -> BrandDraft: ...
 
     async def read_feature(self, input: SiteReadInput) -> FeatureBrief: ...

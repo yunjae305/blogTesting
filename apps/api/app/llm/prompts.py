@@ -5924,29 +5924,6 @@ def site_collect_prompt(brand_name: str, urls: list[str]) -> str:
     )
 
 
-def brand_import_prompt(brand_name: str, research: str) -> str:
-    """훑어 온 것을 브랜드 자료 모양으로 정리하라는 지시."""
-    return "\n".join(
-        [
-            f"아래는 {brand_name} 공식 사이트에서 읽어 온 내용이다.",
-            "",
-            research,
-            "",
-            "이것을 브랜드 자료로 정리하라.",
-            "",
-            "- `description`: 무엇을 하는 곳인지. 줄글 2~6문장.",
-            "- `features`: 핵심 기능·서비스. 줄글. **사이트에 적힌 이름 그대로** 쓴다.",
-            "- `useCases`: '이런 상황이면 이 기능' 표. `feature`에는 **사이트에 인쇄된"
-            " 기능 이름만** 쓴다 — 없는 이름을 지어내면 그것이 그대로 원고에 실려 독자에게"
-            " 거짓말이 된다. 확신이 없으면 그 줄을 넣지 않는다.",
-            "- `links`: 참고할 만한 페이지.",
-            "",
-            "위 내용에 없는 칸은 **비워 둔다.** 비면 사람이 채우면 되지만, 지어낸 것은"
-            " 아무도 못 고친다.",
-        ]
-    )
-
-
 def feature_brief_prompt(brand_name: str, research: str) -> str:
     """신기능 페이지 하나를 읽고 글의 출발점으로 바꾸라는 지시."""
     return "\n".join(
