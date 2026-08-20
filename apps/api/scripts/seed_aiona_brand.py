@@ -106,17 +106,27 @@ async def main() -> None:
         # 마스코트를 넣으려고 --apply를 돌린 사람에게 마스코트가 오지 않았다.
         keep = {}
         if current is not None:
-            builtin = {image["label"] for image in body.get("images", [])}
+            builtin_images = {image["label"] for image in body.get("images", [])}
+            # 문서도 이미지와 같이 합친다(2026-08-20). 정의가 자료 한 벌을 문서로 싣게
+            # 되면서, 올려 둔 것으로 통째로 덮으면 그 문서가 오지 않는다.
+            builtin_docs = {doc["name"] for doc in body.get("documents", [])}
             keep = {
                 "images": [
                     *body.get("images", []),
                     *(
                         image.model_dump(by_alias=True)
                         for image in current.images
-                        if image.label not in builtin
+                        if image.label not in builtin_images
                     ),
                 ],
-                "documents": [doc.model_dump(by_alias=True) for doc in current.documents],
+                "documents": [
+                    *body.get("documents", []),
+                    *(
+                        doc.model_dump(by_alias=True)
+                        for doc in current.documents
+                        if doc.name not in builtin_docs
+                    ),
+                ],
             }
         saved = await service.update_brand(user_id, DEFAULT_BRAND_ID, {**body, **keep})
         # 판번호도 최신으로 못 박는다. 그러지 않으면 다음 조회에서 빈 칸 채우기가 또 돈다.

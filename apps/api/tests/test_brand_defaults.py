@@ -22,7 +22,8 @@ from app.modules.brand import (
     BrandService,
     InMemoryBrandRepository,
 )
-from app.modules.brand.defaults import MASCOTS
+from app.modules.brand.defaults import MASCOTS, default_brand_body
+from app.modules.brand.validation import validate_brand_body
 from app.shared import BrandProfile
 
 
@@ -274,3 +275,75 @@ class TestOlderCopiesGetNewMaterialLater:
         await service.ensure_default_brands("user_1")
 
         assert [b.brand_id for b in await service.list_brands("user_1")] == []
+
+
+class TestTheFullMaterialRidesAlongAsADocument:
+    """자료 한 벌을 **문서로** 싣는다(2026-08-20 사용자 지시: "파일로 넣어둬").
+
+    `description`·`features` 칸은 모든 글의 프롬프트에 그대로 실려서 줄일 수밖에 없다.
+    줄이면 기능 설명의 결이 빠진다 — '심층 리서치'가 무엇을 교차 확인한다는 것인지,
+    앱스튜디오의 앱 타입이 무엇인지 같은 것들이다.
+
+    문서는 그 제약이 없다(2만 자까지). 그래서 줄이지 않은 자료를 거기 둔다. 두 곳에 같은
+    말이 있는 것은 중복이 아니라 **요약과 원본**이다.
+    """
+
+    def test_the_default_brand_ships_with_it(self):
+        cleaned = validate_brand_body(default_brand_body())
+
+        assert [doc.name for doc in cleaned["documents"]] == ["AIONA 브랜드 자료 전체"]
+        assert cleaned["documents"][0].kind == "TEXT"
+
+    def test_it_is_longer_than_the_summary_fields(self):
+        """줄인 것과 안 줄인 것이다. 문서가 더 짧으면 문서를 둘 이유가 없다."""
+        cleaned = validate_brand_body(default_brand_body())
+        document = cleaned["documents"][0].value
+
+        assert len(document) > len(cleaned["features"] or "")
+
+    def test_the_feature_names_are_in_it(self):
+        """원고가 이 이름을 그대로 쓴다. 문서에 없으면 모델이 지어낸다."""
+        document = validate_brand_body(default_brand_body())["documents"][0].value
+
+        for name in ("리서치 코파일럿", "앱스튜디오", "심층 리서치", "고민상담소"):
+            assert name in document, name
+
+    def test_it_reaches_the_prompt_as_a_reference_material(self):
+        """자료가 프롬프트까지 가지 않으면 파일을 둔 뜻이 없다."""
+        from app.modules.brand.service import brand_reference_materials
+
+        profile = BrandProfile(
+            brand_id=DEFAULT_BRAND_ID,
+            user_id="user_1",
+            created_at="x",
+            updated_at="x",
+            **validate_brand_body(default_brand_body()),
+        )
+
+        texts = [
+            material
+            for material in brand_reference_materials(profile)
+            if material["type"] == "TEXT"
+        ]
+
+        assert any("리서치 코파일럿" in material["value"] for material in texts)
+
+    @pytest.mark.asyncio
+    async def test_an_older_copy_gets_it_too(self):
+        """마스코트 때와 같은 일이 되풀이되면 안 된다 — 이미 쓰던 사람에게도 가야 한다."""
+        repository = InMemoryBrandRepository()
+        service = BrandService(repository)
+        await repository.upsert(
+            BrandProfile(
+                brand_id=DEFAULT_BRAND_ID,
+                user_id="user_1",
+                name=DEFAULT_BRAND_NAME,
+                created_at="x",
+                updated_at="x",
+            )
+        )
+
+        await service.ensure_default_brands("user_1")
+        profile = await service.get_brand("user_1", DEFAULT_BRAND_ID)
+
+        assert [doc.name for doc in profile.documents] == ["AIONA 브랜드 자료 전체"]

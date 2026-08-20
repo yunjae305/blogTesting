@@ -327,6 +327,34 @@ CLOSING: dict = {
 }
 
 
+def brand_documents() -> list[dict]:
+    """자료 한 벌을 **문서로** 싣는다(2026-08-20 사용자 지시: "파일로 넣어둬").
+
+    ``description``·``features`` 칸은 **모든 글의 프롬프트에 그대로 실린다.** 그래서 거기에는
+    줄여 담을 수밖에 없고, 줄이면 기능 설명의 결이 빠진다 — '심층 리서치'가 무엇을 교차
+    확인한다는 것인지, 앱스튜디오의 앱 타입이 무엇인지 같은 것들이다.
+
+    문서는 그 제약이 없다(2만 자까지). 그래서 **줄이지 않은 자료**를 여기 두고, 원고를 쓸
+    때 참고자료로 함께 실린다. 두 곳에 같은 말이 있는 것은 중복이 아니라 **요약과 원본**이다.
+
+    손으로 칸을 채우는 대신 이 파일 하나를 고치면 되게 하려는 것이기도 하다 — 기능이
+    바뀌면 `aiona-brand.md`를 고치고 판번호를 올린다.
+    """
+    path = _ART_DIR / "aiona-brand.md"
+    if not path.is_file():
+        return []
+    return [
+        {
+            # 기능 이름이 대부분이라 '핵심 기능·서비스'에 붙인다. 프롬프트에 실릴 때
+            # 이 이름이 앞에 붙어, 모델이 무엇에 대한 자료인지 알고 읽는다.
+            "section": "features",
+            "name": "AIONA 브랜드 자료 전체",
+            "kind": "TEXT",
+            "value": path.read_text(encoding="utf-8"),
+        }
+    ]
+
+
 #: 기본 브랜드 정의의 판번호. **아래 자료를 늘리면 이 숫자를 올린다.**
 #:
 #: 올리면 이미 AIONA 자료를 갖고 있던 사람도 다음 조회에서 새 자료를 받는다 — 단,
@@ -334,7 +362,9 @@ CLOSING: dict = {
 #: 않는다.
 #:
 #: 1 → 2: 마스코트 그림 여덟 장과 고정 해시태그가 생겼다(2026-08-20).
-DEFAULTS_REVISION = 2
+#: 2 → 3: 자료 한 벌을 문서로 실었다(`aiona-brand.md`). 칸을 손으로 채우는 대신 이 파일
+#:        하나를 고치면 되게 하려는 것이다(2026-08-20).
+DEFAULTS_REVISION = 3
 
 #: 모든 글에 고정으로 붙는 해시태그(2026-08-20 사용자 요청: 1~2개).
 #:
@@ -356,6 +386,7 @@ def default_brand_body() -> dict:
         "closing": CLOSING,
         "hashtags": HASHTAGS,
         "images": mascot_images(),
+        "documents": brand_documents(),
     }
 
 
