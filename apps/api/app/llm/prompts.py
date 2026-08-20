@@ -3951,6 +3951,20 @@ def draft_prompt(draft_input: DraftGenerationInput) -> str:
             *_rendered_visual_rules(draft_input),
             *_thumbnail_copy_rules(style_plan, entity),
             f"- 해시태그는 정확히 {hashtag_count}개만 만든다.",
+            *(
+                # 브랜드 해시태그는 글이 다 된 뒤에 코드가 얹는다(2026-08-20). 여기서
+                # 알려 주는 이유는 **또 쓰지 말라**는 것이다 — 모델이 브랜드 이름을
+                # 넣으면 같은 말이 두 번 붙고, 소재로 검색해 들어올 사람이 쓸 말 자리가
+                # 그만큼 줄어든다. 개수는 위 줄대로 소재 쪽에만 쓴다.
+                [
+                    "- 브랜드 이름 해시태그("
+                    + " · ".join(draft_input.input.brand_hashtags[:2])
+                    + ")는 글 끝에 자동으로 붙는다. 직접 만들지 않는다 —"
+                    " 위 개수는 소재·트렌드 쪽 해시태그에만 쓴다."
+                ]
+                if draft_input.input.brand_hashtags
+                else []
+            ),
             "- Hashtags must be specific to the article topic. Do not use generic blog/marketing/search tags unless the article is actually about those topics.",
             f"목적별 구성 가이드: {purpose_guide(purpose)}",
             "목적과 페르소나: 글의 종류와 구성은 목적을 따른다. 페르소나(사용자 설정)는 그 글을 전달하는 화자의 말투와 설명 방식으로만 반영하고, 글의 종류를 바꾸지 않는다. 조합이 지나치게 부자연스러우면 억지로 끼워 맞추지 말고 목적을 우선한다.",

@@ -208,6 +208,34 @@ def _closing(value: Any, errors: list[BrandValidationError]) -> BrandClosing | N
     )
 
 
+def _hashtags(value: Any, errors: list[BrandValidationError]) -> list[str]:
+    """모든 글에 고정으로 붙일 해시태그(2026-08-20).
+
+    '#'과 공백은 떼어 낸다 — 발행할 때 '#'이 붙으므로 여기 남아 있으면 '##AIONA'가 되고,
+    해시태그 안의 공백은 네이버에서 태그를 끊는다.
+    """
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        errors.append(_error("hashtags", "INVALID_TYPE", "해시태그는 목록이어야 합니다."))
+        return []
+    if len(value) > LIMITS.MAX_HASHTAGS:
+        errors.append(
+            _error("hashtags", "TOO_MANY", f"해시태그는 최대 {LIMITS.MAX_HASHTAGS}개입니다.")
+        )
+        return []
+
+    cleaned: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        tag = item.strip().lstrip("#").replace(" ", "")
+        if not tag or tag in cleaned:
+            continue
+        cleaned.append(tag[: LIMITS.MAX_ITEM_LENGTH])
+    return cleaned
+
+
 def _links(value: Any, errors: list[BrandValidationError]) -> list[BrandLink]:
     if value is None:
         return []
@@ -417,6 +445,7 @@ def validate_brand_body(raw_body: Any) -> dict:
         "audiences": _audiences(body.get("audiences"), errors),
         "use_cases": _use_cases(body.get("useCases"), errors),
         "closing": _closing(body.get("closing"), errors),
+        "hashtags": _hashtags(body.get("hashtags"), errors),
         "links": _links(body.get("links"), errors),
         "documents": _documents(body.get("documents"), errors),
         "images": _images(body.get("images"), errors),

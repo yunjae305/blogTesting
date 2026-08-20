@@ -24,6 +24,12 @@
 사용자가 올린 사진에 도는 개인정보 가림은 여기 적용하지 않는다. 이것은 사용자가 찍어
 올린 사진이 아니라 브랜드가 자기 자산으로 등록한 그림이고, 가릴 개인정보가 있다면 그것은
 브랜드 자료를 고칠 일이다.
+
+## 해시태그
+
+브랜드 이름은 소재마다 달라지지 않는다. 그런데도 모델에게 맡기면 회차마다 붙었다 안
+붙었다 하고, 표기까지 흔들린다(AIONA / 아이오나 / Aiona). 그래서 여기서 **고정으로**
+얹는다 — 이 블록의 다른 것들과 같은 이유이고 같은 자리다.
 """
 
 from app.shared import BRAND_MATERIAL_ORIGIN, BrandClosing, FinalPost
@@ -31,6 +37,13 @@ from app.shared.format import escape_html, now_iso
 from app.shared.draft import GeneratedPostImage
 
 from .images import dedupe_images, image_html, image_markdown, mime_type_from_data_url
+
+#: 글 하나에 붙일 브랜드 해시태그 수(2026-08-20 사용자 요청: 1~2개).
+#:
+#: 브랜드가 적어 둔 목록의 **앞에서부터** 고른다. 돌려 쓰지 않는 이유는 '고정'이 곧
+#: 이 요청이기 때문이다 — 글마다 다른 태그가 붙으면 검색에서 하나로 모이지 않는다.
+#: 어느 표기를 쓸지는 브랜드가 순서로 정한다.
+BRAND_HASHTAG_COUNT = 2
 
 #: 마무리 블록의 class 이름. 자식 요소들이 이것을 접두어로 쓴다(blog-closing-note 등).
 CLOSING_CLASS = "blog-closing"
@@ -138,3 +151,35 @@ def append_closing(
         # 바꾼다(routes.get_post_image). 목록에 없으면 네이버에서 그림이 빠진다.
         update["images"] = dedupe_images([*(post.images or []), mascot])
     return post.model_copy(update=update)
+
+
+def with_brand_hashtags(
+    post: FinalPost, tags: list[str] | None, *, count: int = BRAND_HASHTAG_COUNT
+) -> FinalPost:
+    """브랜드 해시태그를 원고 해시태그 **뒤에** 붙인다.
+
+    **원고가 만든 해시태그를 밀어내지 않는다.** 그쪽은 소재로 검색해 들어올 사람이 쓰는
+    말이고, 이쪽은 브랜드를 모으는 말이다 — 하나가 다른 하나를 대신할 수 없다. 개수
+    설정(`hashtagCount`)은 앞의 것에만 적용된다고 읽는다. 이미지 상한에서 마스코트를
+    빼지 않는 것과 같은 판단이다.
+
+    이미 같은 태그가 있으면 더하지 않는다. 대소문자만 다른 것도 같은 것으로 본다 —
+    발행하면 `#AIONA`와 `#aiona`가 나란히 서는데, 읽는 사람에게는 같은 말이다.
+    """
+    picked = [tag.strip().lstrip("#") for tag in (tags or []) if tag and tag.strip()]
+    if not picked or count <= 0:
+        return post
+
+    existing = {tag.strip().lstrip("#").lower() for tag in (post.hashtags or [])}
+    added: list[str] = []
+    for tag in picked:
+        if len(added) >= count:
+            break
+        if tag.lower() in existing:
+            continue
+        existing.add(tag.lower())
+        added.append(tag)
+
+    if not added:
+        return post
+    return post.model_copy(update={"hashtags": [*(post.hashtags or []), *added]})

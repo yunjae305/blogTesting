@@ -22,6 +22,8 @@ from app.modules.brand import (
     BrandService,
     InMemoryBrandRepository,
 )
+from app.modules.brand.defaults import MASCOTS
+from app.shared import BrandProfile
 
 
 def service() -> BrandService:
@@ -188,3 +190,87 @@ class TestTheDefaultCanBeDeletedForGood:
             await service().delete_brand("user_1", "brand_없는것")
 
         assert caught.value.code == "NOT_FOUND"
+
+
+class TestOlderCopiesGetNewMaterialLater:
+    """기본 브랜드에 자료가 늘면 **이미 쓰던 사람에게도** 가야 한다(2026-08-20).
+
+    "없으면 만든다"만 있었을 때, 한 번 만들어진 뒤에 정의로 새 자료가 들어오면(마스코트
+    그림, 고정 해시태그) 이미 쓰던 사람에게는 영영 오지 않았다 — 등록한 적도 없는 자료가
+    자기 것만 비어 있는데, 사용자에게는 그것을 알 방법도 고칠 방법도 없었다.
+
+    실제로 겪은 일이다: 마스코트를 넣었는데 원고에 나오지 않았다. 코드는 맞았고, 그 사람의
+    AIONA 자료가 마스코트보다 먼저 만들어져 있었다.
+    """
+
+    @pytest.mark.asyncio
+    async def test_an_old_copy_gets_the_mascots_and_hashtags(self):
+        repository = InMemoryBrandRepository()
+        service = BrandService(repository)
+        # 마스코트도 해시태그도 없던 시절의 자료.
+        await repository.upsert(
+            BrandProfile(
+                brand_id=DEFAULT_BRAND_ID,
+                user_id="user_1",
+                name=DEFAULT_BRAND_NAME,
+                created_at="x",
+                updated_at="x",
+            )
+        )
+
+        await service.ensure_default_brands("user_1")
+        profile = await service.get_brand("user_1", DEFAULT_BRAND_ID)
+
+        assert len(profile.images) == len(MASCOTS)
+        assert profile.hashtags[:2] == ["AIONA", "아이오나"]
+        assert profile.use_cases
+
+    @pytest.mark.asyncio
+    async def test_hand_written_text_is_not_overwritten(self):
+        """손으로 다듬어 둔 글자를 되돌리면 그 편집이 통째로 사라진다."""
+        repository = InMemoryBrandRepository()
+        service = BrandService(repository)
+        await repository.upsert(
+            BrandProfile(
+                brand_id=DEFAULT_BRAND_ID,
+                user_id="user_1",
+                name=DEFAULT_BRAND_NAME,
+                description="내가 고쳐 둔 소개",
+                created_at="x",
+                updated_at="x",
+            )
+        )
+
+        await service.ensure_default_brands("user_1")
+        profile = await service.get_brand("user_1", DEFAULT_BRAND_ID)
+
+        assert profile.description == "내가 고쳐 둔 소개"
+        # 비어 있던 칸은 채워졌다.
+        assert profile.images
+
+    @pytest.mark.asyncio
+    async def test_it_only_happens_once(self):
+        """그 뒤로는 사용자가 비운 것이 곧 뜻이다 — 일부러 지운 그림이 되살아나면 안 된다."""
+        repository = InMemoryBrandRepository()
+        service = BrandService(repository)
+        await service.ensure_default_brands("user_1")
+
+        profile = await service.get_brand("user_1", DEFAULT_BRAND_ID)
+        await repository.upsert(profile.model_copy(update={"images": [], "hashtags": []}))
+        await service.ensure_default_brands("user_1")
+
+        again = await service.get_brand("user_1", DEFAULT_BRAND_ID)
+        assert again.images == []
+        assert again.hashtags == []
+
+    @pytest.mark.asyncio
+    async def test_a_deleted_default_brand_stays_deleted(self):
+        """빈 칸 채우기가 무덤을 열어서는 안 된다."""
+        repository = InMemoryBrandRepository()
+        service = BrandService(repository)
+        await service.ensure_default_brands("user_1")
+        await service.delete_brand("user_1", DEFAULT_BRAND_ID)
+
+        await service.ensure_default_brands("user_1")
+
+        assert [b.brand_id for b in await service.list_brands("user_1")] == []

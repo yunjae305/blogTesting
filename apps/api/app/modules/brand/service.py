@@ -20,7 +20,7 @@ from app.shared import (
 from app.shared.format import now_iso
 from app.shared.ids import new_brand_id
 
-from .defaults import DEFAULT_BRAND_ID, default_brand_body
+from .defaults import DEFAULT_BRAND_ID, DEFAULTS_REVISION, default_brand_body
 from .fit import brand_use_case_lines, evaluate_brand_fit, use_case_brief
 from .repository import BrandRepository
 from .validation import validate_brand_body
@@ -53,27 +53,80 @@ class BrandService:
         한 번 등록해 주어야 하는 것이 아니라 **처음부터 거기 있어야 한다** — 서버를 새로
         세우거나 계정을 새로 만들어도 브랜드 고르기 칸에 이미 있다.
 
-        **이미 있으면 손대지 않는다.** 사용자가 이미지·문구를 고쳐 두었는데 조회할 때마다
-        코드가 원래 값으로 되돌리면 그 편집이 통째로 사라진다. 정의를 고쳐 기존 자료에도
-        반영하려면 `scripts/seed_aiona_brand.py --apply`를 쓴다 — 덮어쓰기는 사람이 눈으로
-        확인하고 하는 일이다.
+        **손으로 고쳐 둔 글자는 덮어쓰지 않는다.** 사용자가 문구를 다듬어 두었는데 조회할
+        때마다 코드가 원래 값으로 되돌리면 그 편집이 통째로 사라진다.
+
+        **다만 빈 칸은 채운다**(2026-08-20). "없으면 만든다"만 있었을 때, 한 번 만들어진
+        뒤에 정의로 새 자료가 들어오면(마스코트 그림, 고정 해시태그) 이미 쓰던 사람에게는
+        영영 오지 않았다 — 등록한 적도 없는 자료가 자기 것만 비어 있는데, 사용자에게는
+        그것을 알 방법도 고칠 방법도 없다. 그래서 판번호(`DEFAULTS_REVISION`)가 뒤처져
+        있으면 **비어 있는 칸만** 지금 정의에서 채운다. 채워져 있는 칸은 그대로 둔다.
+
+        통째로 되돌리려면 `scripts/seed_aiona_brand.py --apply`를 쓴다 — 덮어쓰기는 사람이
+        눈으로 확인하고 하는 일이다.
 
         브랜드 id가 사람마다 같은 값으로 고정돼 있어(`DEFAULT_BRAND_ID`), 두 요청이 동시에
         들어와도 같은 문서를 두 번 쓸 뿐 두 벌이 되지 않는다.
         """
+        stamp = now_iso()
+        existing = await self._repository.find(user_id, DEFAULT_BRAND_ID)
+        if existing is not None:
+            await self._backfill_default_brand(existing, stamp)
+            return
         # **지운 것까지 센다.** 사용자가 기본 브랜드를 지웠으면 그 자리에 '지웠다'는
-        # 표시가 남아 있다 — 그것을 못 보면 다음 조회에서 되살아나고, 사용자는 지운 것이
-        # 왜 돌아왔는지 알 수 없다.
+        # 표시가 남아 있다 — 조회(`find`)는 그것을 없는 것으로 다루므로 여기까지 온다.
+        # 표시를 못 보면 다음 조회에서 되살아나고, 사용자는 지운 것이 왜 돌아왔는지 알 수
+        # 없다.
         if await self._repository.exists(user_id, DEFAULT_BRAND_ID):
             return
-        stamp = now_iso()
         await self._repository.upsert(
             BrandProfile(
                 brand_id=DEFAULT_BRAND_ID,
                 user_id=user_id,
                 created_at=stamp,
                 updated_at=stamp,
+                defaults_revision=DEFAULTS_REVISION,
                 **validate_brand_body(default_brand_body()),
+            )
+        )
+
+    async def _backfill_default_brand(self, existing: BrandProfile, stamp: str) -> None:
+        """이미 있는 기본 브랜드의 **빈 칸만** 지금 정의로 채운다(2026-08-20).
+
+        판번호가 최신이면 아무것도 하지 않는다 — 그 뒤로는 사용자가 비운 것이 곧 뜻이다.
+        (마스코트를 일부러 지웠는데 조회할 때마다 되살아나면 그것도 못 고치는 것이다.)
+
+        '빈 칸'만 보는 이유: 무엇을 고쳤는지 알 방법이 없으니, 확실히 안전한 것만 만진다.
+        비어 있는 칸을 채우는 것은 어떤 편집도 지우지 않는다.
+        """
+        if existing.defaults_revision >= DEFAULTS_REVISION:
+            return
+        defaults = validate_brand_body(default_brand_body())
+        # 값이 있으면 손대지 않는다. 목록 칸은 비었을 때만, 글자 칸도 비었을 때만.
+        filled = {
+            field: defaults[field]
+            for field in (
+                "images",
+                "hashtags",
+                "use_cases",
+                "audiences",
+                "links",
+                "documents",
+                "description",
+                "features",
+                "closing",
+            )
+            if defaults.get(field) and not getattr(existing, field)
+        }
+        await self._repository.upsert(
+            existing.model_copy(
+                update={
+                    **filled,
+                    # 판번호는 채운 것이 없어도 올린다. 그러지 않으면 조회할 때마다 다시
+                    # 훑고, 사용자가 일부러 비워 둔 칸을 매번 채우려 든다.
+                    "defaults_revision": DEFAULTS_REVISION,
+                    "updated_at": stamp if filled else existing.updated_at,
+                }
             )
         )
 
@@ -360,6 +413,8 @@ async def with_brand_materials(
         # 닿은 줄만 싣는다. 표 전체는 이미 참고자료에 있고, 거기서 모델이 고르게 두면
         # 소재와 무관한 기능이 붙는다.
         "brandUseCases": brand_use_case_lines(profile, fit) if fit and profile else [],
+        # 모든 글에 고정으로 붙는 해시태그. 아래 마무리와 같은 이유로 베껴 둔다.
+        "brandHashtags": list(profile.hashtags) if profile is not None else [],
         # 글 맨 끝에 붙일 마무리. **지금 정해져 있는 문구를 베껴 둔다** — 나중에 브랜드
         # 자료를 고쳐도 이미 나간 글의 마무리는 바뀌지 않아야 한다.
         "brandClosing": (

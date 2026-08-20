@@ -97,6 +97,9 @@ class BrandLimits:
     MAX_USE_CASES = 30
     #: 기준표 한 줄이 갖는 검색어 수.
     MAX_USE_CASE_KEYWORDS = 12
+    #: 고정 해시태그 후보 수. 실제로 글에 붙는 것은 앞의 두 개다(BRAND_HASHTAG_COUNT) —
+    #: 나머지는 순서를 바꿔 쓰기 위한 자리다.
+    MAX_HASHTAGS = 8
     #: '기타'에 직접 적는 글자 수.
     MAX_AUDIENCE_OTHER_LENGTH = 100
     MAX_DOCUMENTS = 5
@@ -262,6 +265,14 @@ class BrandProfile(CamelModel):
     links: list[BrandLink] = []
     #: 글 맨 마지막에 언제나 붙는 마무리(사실 한 줄 + 링크). 없으면 아무것도 붙지 않는다.
     closing: BrandClosing | None = None
+    #: 모든 글에 **고정으로** 붙일 해시태그(2026-08-20 사용자 요청). 앞에서부터 두 개를 쓴다.
+    #:
+    #: 브랜드 이름은 소재마다 달라지지 않으므로 모델에게 맡기지 않는다 — 맡기면 회차마다
+    #: 붙었다 안 붙었다 하고, 표기도 흔들린다(AIONA / 아이오나 / Aiona). 어느 표기를 쓸지는
+    #: 브랜드가 정할 일이라 **순서**로 고른다: 앞의 두 개가 쓰인다.
+    #:
+    #: '#'은 적지 않는다. 발행할 때 붙는다.
+    hashtags: list[str] = []
     #: 올려 둔 텍스트·PDF 문서. 줄글로 적기 어려운 긴 자료를 파일째 둔다.
     documents: list[BrandDocument] = []
     images: list[BrandImage] = []
@@ -276,6 +287,13 @@ class BrandProfile(CamelModel):
     #:
     #: 되살리려면 `scripts/seed_aiona_brand.py --apply`를 쓴다.
     deleted_at: str | None = None
+    #: 이 문서가 만들어질 때의 **기본 브랜드 정의 판번호**(2026-08-20). 기본 브랜드에만 쓴다.
+    #:
+    #: 기본 브랜드는 "없으면 만든다"였다. 그래서 한 번 만들어진 뒤에 정의에 새 자료가
+    #: 붙으면(마스코트 그림, 고정 해시태그) **이미 쓰던 사람에게는 영영 오지 않았다** —
+    #: 사용자는 등록한 적도 없는 자료가 왜 자기 것만 비어 있는지 알 수 없다.
+    #: 판번호가 뒤처져 있으면 `ensure_default_brands`가 빈 칸만 채워 준다.
+    defaults_revision: int = 0
 
 
 class BrandListItem(CamelModel):

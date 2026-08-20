@@ -32,6 +32,7 @@ from app.modules.auth.repository import normalize_email  # noqa: E402
 from app.modules.brand import (  # noqa: E402
     DEFAULT_BRAND_ID,
     DEFAULT_BRAND_NAME,
+    DEFAULTS_REVISION,
     BrandService,
     MongoBrandRepository,
     default_brand_body,
@@ -97,13 +98,31 @@ async def main() -> None:
                 )
             return
 
-        # 이미지·문서는 넘기지 않는다 — 자료 검증이 "보내지 않은 것은 없는 것"으로 읽어
-        # 통째로 지워지기 때문이다. 올려 둔 것을 그대로 실어 보낸다.
-        keep = {
-            "images": [image.model_dump(by_alias=True) for image in current.images],
-            "documents": [doc.model_dump(by_alias=True) for doc in current.documents],
-        } if current is not None else {}
+        # 이미지·문서는 넘기지 않으면 사라진다 — 자료 검증이 "보내지 않은 것은 없는
+        # 것"으로 읽는다. 올려 둔 것을 그대로 실어 보낸다.
+        #
+        # 다만 **이미지는 합친다**(2026-08-20). 예전에는 올려 둔 것으로 통째로 덮었는데,
+        # 정의에 마스코트가 생긴 뒤로는 그것이 곧 "마스코트를 빼고 덮어쓰기"가 됐다 —
+        # 마스코트를 넣으려고 --apply를 돌린 사람에게 마스코트가 오지 않았다.
+        keep = {}
+        if current is not None:
+            builtin = {image["label"] for image in body.get("images", [])}
+            keep = {
+                "images": [
+                    *body.get("images", []),
+                    *(
+                        image.model_dump(by_alias=True)
+                        for image in current.images
+                        if image.label not in builtin
+                    ),
+                ],
+                "documents": [doc.model_dump(by_alias=True) for doc in current.documents],
+            }
         saved = await service.update_brand(user_id, DEFAULT_BRAND_ID, {**body, **keep})
+        # 판번호도 최신으로 못 박는다. 그러지 않으면 다음 조회에서 빈 칸 채우기가 또 돈다.
+        saved = await service._repository.upsert(
+            saved.model_copy(update={"defaults_revision": DEFAULTS_REVISION})
+        )
         print(f"\n덮어썼습니다: {saved.brand_id}")
         print(f"이미지 {len(saved.images)}장 · 문서 {len(saved.documents)}개는 그대로 남았습니다.")
     finally:

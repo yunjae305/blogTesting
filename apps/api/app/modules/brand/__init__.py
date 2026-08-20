@@ -10,7 +10,12 @@
 얹는 것이 자연스러운지 재는 `evaluate_brand_fit`(A·B·C)이다.
 """
 
-from .defaults import DEFAULT_BRAND_ID, DEFAULT_BRAND_NAME, default_brand_body
+from .defaults import (
+    DEFAULT_BRAND_ID,
+    DEFAULT_BRAND_NAME,
+    DEFAULTS_REVISION,
+    default_brand_body,
+)
 from .fit import (
     BRAND_FIT_DIRECT,
     BRAND_FIT_FORCED,
@@ -58,6 +63,7 @@ __all__ = [
     "InMemoryBrandRepository",
     "MongoBrandRepository",
     "brand_brief",
+    "DEFAULTS_REVISION",
     "default_brand_body",
     "brand_mode_for",
     "brand_reference_materials",

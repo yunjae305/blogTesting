@@ -143,6 +143,9 @@ class BlogTaskInput(CamelModel):
     #: 그대로 발행되므로, **이 글을 만들 때 정해져 있던 문구**가 그 글의 것이어야 한다.
     #: 나중에 브랜드 자료를 고쳐도 이미 나간 글의 마무리는 바뀌지 않는다.
     brand_closing: BrandClosing | None = None
+    #: 이 글에 고정으로 붙일 브랜드 해시태그. 저장 시점의 브랜드 자료에서 베껴 둔다 —
+    #: 나중에 자료를 고쳐도 이미 나간 글의 해시태그는 바뀌지 않는다(마무리와 같은 이유).
+    brand_hashtags: list[str] = Field(default_factory=list)
     purpose: list[str] | None = None
     keywords: list[str]
     tone: str | None = None

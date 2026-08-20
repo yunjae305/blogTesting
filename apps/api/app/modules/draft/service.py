@@ -81,7 +81,7 @@ from .card_selection import (
     select_cards,
 )
 from .brand_art import insert_brand_art
-from .closing import append_closing
+from .closing import append_closing, with_brand_hashtags
 from .editor import parse_edited_html
 # 회차 상한은 더 이상 이 모듈의 상수가 아니라 설정값이다(config.final_review_max_rounds).
 from .final_review import (
@@ -2992,7 +2992,7 @@ class DraftService:
         raise BlogTaskError("LLM_RESPONSE_INVALID", f"원고 품질 검사를 통과하지 못했습니다: {report}")
 
     def _with_closing(self, result, draft_input: DraftGenerationInput):
-        """브랜드 삽화를 본문에 넣고, 맨 끝에 마무리를 붙인다.
+        """브랜드 삽화를 본문에 넣고, 맨 끝에 마무리와 고정 해시태그를 붙인다.
 
         모델을 부르지 않으므로 실패할 것이 없다 — 문구는 글을 저장할 때 이미 베껴 둔
         값이고(``BlogTaskInput.brand_closing``), 그림은 글의 참고자료 안에서 찾는다.
@@ -3014,6 +3014,9 @@ class DraftService:
             draft_input.input.brand_closing,
             draft_input.input.reference_materials,
         )
+        # 브랜드 해시태그도 여기서 얹는다. 모델에게 맡기면 회차마다 붙었다 안 붙었다 하고
+        # 표기까지 흔들린다(AIONA / 아이오나 / Aiona) — '고정'이 곧 사용자의 요청이었다.
+        updated = with_brand_hashtags(updated, draft_input.input.brand_hashtags)
         return result if updated is post else result.model_copy(update={"final_post": updated})
 
     async def update_draft_text(self, post_id: str, raw_body: Any) -> BlogTask:

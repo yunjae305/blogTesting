@@ -34,6 +34,7 @@ function brand(overrides: Partial<BrandProfile> = {}): BrandProfile {
     description: "소개",
     features: null,
     useCases: [],
+    hashtags: [],
     audiences: [],
     links: [],
     documents: [],

@@ -319,6 +319,23 @@ CLOSING: dict = {
 }
 
 
+#: 기본 브랜드 정의의 판번호. **아래 자료를 늘리면 이 숫자를 올린다.**
+#:
+#: 올리면 이미 AIONA 자료를 갖고 있던 사람도 다음 조회에서 새 자료를 받는다 — 단,
+#: **비어 있는 칸만** 채운다(`ensure_default_brands`). 손으로 고쳐 둔 글자는 건드리지
+#: 않는다.
+#:
+#: 1 → 2: 마스코트 그림 여덟 장과 고정 해시태그가 생겼다(2026-08-20).
+DEFAULTS_REVISION = 2
+
+#: 모든 글에 고정으로 붙는 해시태그(2026-08-20 사용자 요청: 1~2개).
+#:
+#: **앞의 두 개가 쓰인다.** 한글 표기와 영문 표기를 나란히 두는 이유는 사람들이 둘 다로
+#: 검색하기 때문이다 — 'AIONA'만 달면 '아이오나'로 찾는 사람에게 이 글이 걸리지 않는다.
+#: 셋째부터는 지금 붙지 않는다. 나중에 순서를 바꿔 쓸 자리다.
+HASHTAGS: list[str] = ["AIONA", "아이오나", "아이오나AI", "AI업무자동화"]
+
+
 def default_brand_body() -> dict:
     """기본 브랜드 자료 한 벌. 저장 검증(`validate_brand_body`)이 받는 모양이다."""
     return {
@@ -329,6 +346,7 @@ def default_brand_body() -> dict:
         "audiences": AUDIENCES,
         "links": LINKS,
         "closing": CLOSING,
+        "hashtags": HASHTAGS,
         "images": mascot_images(),
     }
 
@@ -338,3 +356,4 @@ def default_brand_body() -> dict:
 assert len(DESCRIPTION) <= BrandLimits.MAX_SECTION_LENGTH, "브랜드 소개가 상한을 넘습니다"
 assert len(FEATURES) <= BrandLimits.MAX_SECTION_LENGTH, "핵심 기능·서비스가 상한을 넘습니다"
 assert len(USE_CASES) <= BrandLimits.MAX_USE_CASES, "기준표가 상한을 넘습니다"
+assert len(HASHTAGS) <= BrandLimits.MAX_HASHTAGS, "고정 해시태그가 상한을 넘습니다"

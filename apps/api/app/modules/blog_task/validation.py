@@ -411,6 +411,8 @@ def validate_blog_task_input(
         brand_fit_grade=_validate_brand_fit_grade(body.get("brandFitGrade")),
         brand_use_cases=_validate_use_case_lines(body.get("brandUseCases")),
         brand_closing=_validate_brand_closing(body.get("brandClosing")),
+        # 라우트가 브랜드 자료에서 베껴 넣은 값이다. 문자열 목록이 아니면 비운다.
+        brand_hashtags=_validate_use_case_lines(body.get("brandHashtags")),
         purpose=purpose,
         keywords=purpose,
         tone=tone,

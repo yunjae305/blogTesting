@@ -478,6 +478,10 @@ COLLECTIONS: dict[str, dict] = {
                     # 글 맨 끝에 붙는 마무리(사실 한 줄 + 링크). 모양은 애플리케이션
                     # 검증(modules/brand/validation.py)이 지킨다.
                     "closing": {"bsonType": ["object", "null"]},
+                    # 모든 글에 고정으로 붙는 해시태그(2026-08-20).
+                    "hashtags": {"bsonType": "array"},
+                    # 기본 브랜드 정의의 판번호. 뒤처져 있으면 빈 칸을 채워 준다.
+                    "defaultsRevision": {"bsonType": ["int", "long"]},
                     # 지운 시각(2026-08-20). 기본 브랜드에만 쓰인다 — 문서를 없애면
                     # 다시 만들어 주는 자리가 되살리므로, 지웠다는 사실만 남긴다.
                     "deletedAt": {"bsonType": ["string", "null"]},

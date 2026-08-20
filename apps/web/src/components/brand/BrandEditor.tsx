@@ -124,6 +124,47 @@ function BrandSection({
  * 여기 적는 것은 **사실**이다. 이 글자는 검수를 거치지 않고 그대로 발행되므로, 가입
  * 조건·크레딧 수가 바뀌면 여기서 고쳐야 한다.
  */
+function HashtagField({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  /**
+   * 모든 글에 고정으로 붙는 해시태그(2026-08-20 사용자 요청).
+   *
+   * 쉼표로 끊는 한 줄 입력이다. 줄마다 칸을 두지 않는 이유는 이것이 보통 두세 개짜리
+   * 짧은 목록이라서다 — 칸을 늘렸다 줄였다 하는 품이 적는 품보다 크다.
+   *
+   * '#'은 여기서 적지 않는다. 발행할 때 붙는다.
+   */
+  return (
+    <div className="brand-field">
+      <span className="brand-field-label">모든 글에 붙일 해시태그</span>
+      <span className="brand-field-hint">
+        쉼표로 구분해 적습니다. <strong>앞의 두 개</strong>가 모든 글 끝에 붙습니다 —
+        원고가 만든 소재 해시태그는 그대로 두고 그 뒤에 더합니다. <strong>#은 빼고</strong>{" "}
+        적어 주세요.
+      </span>
+      <input
+        aria-label="모든 글에 붙일 해시태그"
+        placeholder="예: AIONA, 아이오나"
+        value={value.join(", ")}
+        onChange={(event) =>
+          onChange(
+            event.target.value
+              .split(",")
+              .map((tag) => tag.trim().replace(/^#+/, ""))
+              // 빈 칸은 여기서 버리지 않는다 — 버리면 쉼표를 찍는 순간 커서가 튄다.
+              .filter((tag, index, all) => tag || index === all.length - 1),
+          )
+        }
+      />
+    </div>
+  );
+}
+
 function ClosingFields({
   value,
   onChange,
@@ -337,6 +378,7 @@ type Draft = {
   description: string;
   features: string;
   useCases: BrandUseCase[];
+  hashtags: string[];
   closing: BrandClosing;
   audiences: BrandAudience[];
   links: BrandLink[];
@@ -350,6 +392,7 @@ function toDraft(brand: BrandProfile | null): Draft {
     description: brand?.description ?? "",
     features: brand?.features ?? "",
     useCases: brand?.useCases ?? [],
+    hashtags: brand?.hashtags ?? [],
     // 빈 칸으로 시작한다 — 서버는 안내 문구와 주소가 **둘 다** 있을 때만 저장한다.
     closing: brand?.closing ?? { note: "", label: "", url: "", imageLabel: "" },
     audiences: brand?.audiences ?? [],
@@ -591,6 +634,8 @@ export function BrandEditor({
         useCases: draft.useCases.filter(
           (item) => item.situation.trim() && item.feature.trim(),
         ),
+        // 빈 칸은 여기서 버린다. 입력 중에는 남겨 두어야 커서가 튀지 않는다.
+        hashtags: draft.hashtags.map((tag) => tag.trim()).filter(Boolean),
         // 안내 문구와 주소가 둘 다 있을 때만 보낸다. 하나만 채운 것은 안 쓰겠다는 뜻이다.
         closing:
           draft.closing.note.trim() && draft.closing.url.trim()
@@ -807,6 +852,11 @@ export function BrandEditor({
               <UseCaseTable
                 rows={draft.useCases}
                 onChange={(next) => set("useCases", next)}
+              />
+
+              <HashtagField
+                value={draft.hashtags}
+                onChange={(next) => set("hashtags", next)}
               />
 
               <ClosingFields

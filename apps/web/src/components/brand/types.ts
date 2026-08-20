@@ -94,6 +94,13 @@ export interface BrandProfile {
   useCases: BrandUseCase[];
   /** 글 맨 마지막에 언제나 붙는 마무리. 없으면 아무것도 붙지 않는다. */
   closing?: BrandClosing | null;
+  /**
+   * 모든 글에 **고정으로** 붙는 해시태그(2026-08-20). 앞에서부터 두 개가 쓰인다.
+   *
+   * 모델에게 맡기지 않는다 — 맡기면 회차마다 붙었다 안 붙었다 하고 표기도 흔들린다
+   * (AIONA / 아이오나 / Aiona). '#'은 적지 않는다. 발행할 때 붙는다.
+   */
+  hashtags: string[];
   /** 주요 고객. 자유 입력이 아니라 고른 것이다(대분류 → 유형). */
   audiences: BrandAudience[];
   links: BrandLink[];
