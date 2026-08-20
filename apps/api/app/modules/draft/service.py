@@ -80,6 +80,7 @@ from .card_selection import (
     section_number,
     select_cards,
 )
+from .brand_art import insert_brand_art
 from .closing import append_closing
 from .editor import parse_edited_html
 # 회차 상한은 더 이상 이 모듈의 상수가 아니라 설정값이다(config.final_review_max_rounds).
@@ -2991,20 +2992,29 @@ class DraftService:
         raise BlogTaskError("LLM_RESPONSE_INVALID", f"원고 품질 검사를 통과하지 못했습니다: {report}")
 
     def _with_closing(self, result, draft_input: DraftGenerationInput):
-        """완성된 원고 끝에 브랜드 마무리를 붙인다. 붙일 것이 없으면 그대로 둔다.
+        """브랜드 삽화를 본문에 넣고, 맨 끝에 마무리를 붙인다.
 
         모델을 부르지 않으므로 실패할 것이 없다 — 문구는 글을 저장할 때 이미 베껴 둔
-        값이고(``BlogTaskInput.brand_closing``), 이미지는 글의 참고자료 안에서 찾는다.
+        값이고(``BlogTaskInput.brand_closing``), 그림은 글의 참고자료 안에서 찾는다.
+
+        **순서가 있다.** 삽화를 먼저 넣고 마무리를 뒤에 붙인다: 마무리는 글의 맨 끝에
+        붙는 블록이라, 그 뒤에 삽화를 끼우면 안내 아래에 그림이 떨어진다.
         """
         post = getattr(result, "final_post", None)
         if post is None:
             return result
-        closed = append_closing(
+        updated = insert_brand_art(
             post,
+            draft_input.input.reference_materials,
+            post_id=draft_input.post_id,
+            closing=draft_input.input.brand_closing,
+        )
+        updated = append_closing(
+            updated,
             draft_input.input.brand_closing,
             draft_input.input.reference_materials,
         )
-        return result if closed is post else result.model_copy(update={"final_post": closed})
+        return result if updated is post else result.model_copy(update={"final_post": updated})
 
     async def update_draft_text(self, post_id: str, raw_body: Any) -> BlogTask:
         """사용자가 미리보기에서 원고를 손수 다시 썼다.

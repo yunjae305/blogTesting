@@ -45,6 +45,14 @@ type Props = {
   /** 고른 브랜드의 id와 이름. 이름은 요약 칸이 '소재' 자리에 그릴 값이다. */
   onChange: (brandId: string, brandName: string) => void;
   /**
+   * 칸 이름 옆 배지. 기본은 '선택'이다.
+   *
+   * 새 글 작성에서는 **소재와 브랜드 중 하나는 있어야** 넘어가므로 그쪽이 '둘 중 하나'로
+   * 바꿔 준다(2026-08-20 사용자 지적: 둘 다 '선택'이면 아무것도 안 채워도 되는 줄 안다).
+   * 자동 포스팅은 소재를 줄마다 적으므로 브랜드가 정말 선택이라 기본값 그대로다.
+   */
+  badge?: string;
+  /**
    * 들어온 경로(`?campaign=aiona`). 이름이 같은 브랜드를 **한 번** 미리 골라 준다.
    *
    * 새 글일 때만 부모가 채워 준다. 저장된 글에서도 이 값이 오면, 브랜드를 일부러 뺀 글을
@@ -61,7 +69,13 @@ type Props = {
   children?: ReactNode;
 };
 
-export function BrandPicker({ brandId, onChange, campaign = "", children }: Props) {
+export function BrandPicker({
+  brandId,
+  onChange,
+  campaign = "",
+  badge = "선택",
+  children,
+}: Props) {
   const { reportError } = useStore();
 
   // null은 '아직 받는 중'. 빈 배열은 '등록한 브랜드가 없음'이라는 확정된 답이다.
@@ -143,7 +157,7 @@ export function BrandPicker({ brandId, onChange, campaign = "", children }: Prop
             글을 쓴다"로 읽히는데, 이제 이 칸이 주로 하는 일은 그것이 아니다 — 트렌드
             글에 **활용한 도구로** 브랜드를 얹는 쪽이다. */}
         <label htmlFor="brandId">활용할 브랜드 · 서비스</label>
-        <span className="field-badge opt">선택</span>
+        <span className={`field-badge ${badge === "선택" ? "opt" : "req"}`}>{badge}</span>
       </div>
 
       <select

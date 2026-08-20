@@ -35,6 +35,7 @@ class BrandRepository(Protocol):
     async def list_items_by_user_id(self, user_id: str) -> list[BrandListItem]: ...
     async def find(self, user_id: str, brand_id: str) -> BrandProfile | None: ...
     async def find_light(self, user_id: str, brand_id: str) -> BrandProfile | None: ...
+    async def exists(self, user_id: str, brand_id: str) -> bool: ...
     async def upsert(self, profile: BrandProfile) -> BrandProfile: ...
     async def delete(self, user_id: str, brand_id: str) -> bool: ...
 
@@ -44,7 +45,11 @@ class InMemoryBrandRepository:
         self._by_key: dict[tuple[str, str], BrandProfile] = {}
 
     async def list_by_user_id(self, user_id: str) -> list[BrandProfile]:
-        found = [p for (uid, _), p in self._by_key.items() if uid == user_id]
+        found = [
+            p
+            for (uid, _), p in self._by_key.items()
+            if uid == user_id and p.deleted_at is None
+        ]
         # 최근에 고친 것이 위로. 화면이 목록을 그대로 그린다.
         return sorted(found, key=lambda p: p.updated_at, reverse=True)
 
@@ -52,11 +57,16 @@ class InMemoryBrandRepository:
         return [BrandListItem.of(p) for p in await self.list_by_user_id(user_id)]
 
     async def find(self, user_id: str, brand_id: str) -> BrandProfile | None:
-        return self._by_key.get((user_id, brand_id))
+        profile = self._by_key.get((user_id, brand_id))
+        return None if profile is None or profile.deleted_at else profile
+
+    async def exists(self, user_id: str, brand_id: str) -> bool:
+        """지운 것까지 센다 — 다시 만들어 줄지 판단하는 자리만 이것을 본다."""
+        return (user_id, brand_id) in self._by_key
 
     async def find_light(self, user_id: str, brand_id: str) -> BrandProfile | None:
         profile = self._by_key.get((user_id, brand_id))
-        if profile is None:
+        if profile is None or profile.deleted_at:
             return None
         return profile.model_copy(update={"images": [], "documents": []})
 
@@ -77,19 +87,31 @@ class MongoBrandRepository:
         self._collection = db[COLLECTION]
 
     async def list_by_user_id(self, user_id: str) -> list[BrandProfile]:
-        cursor = self._collection.find({"userId": user_id}).sort("updatedAt", -1)
+        cursor = self._collection.find(
+            {"userId": user_id, "deletedAt": None}
+        ).sort("updatedAt", -1)
         return [BrandProfile.model_validate(strip_id(d)) async for d in cursor]
 
     async def list_items_by_user_id(self, user_id: str) -> list[BrandListItem]:
         """목록용 가벼운 조회. base64는 **Mongo에서부터 읽지 않는다.**"""
-        cursor = self._collection.find({"userId": user_id}, _LIST_PROJECTION).sort(
-            "updatedAt", -1
-        )
+        cursor = self._collection.find(
+            {"userId": user_id, "deletedAt": None}, _LIST_PROJECTION
+        ).sort("updatedAt", -1)
         return [BrandListItem.model_validate(strip_id(d)) async for d in cursor]
 
     async def find(self, user_id: str, brand_id: str) -> BrandProfile | None:
-        document = await self._collection.find_one({"userId": user_id, "brandId": brand_id})
+        # `{"deletedAt": None}`은 그 필드가 **아예 없는** 옛 문서도 함께 고른다(Mongo 규칙).
+        document = await self._collection.find_one(
+            {"userId": user_id, "brandId": brand_id, "deletedAt": None}
+        )
         return BrandProfile.model_validate(strip_id(document)) if document else None
+
+    async def exists(self, user_id: str, brand_id: str) -> bool:
+        """지운 것까지 센다 — 다시 만들어 줄지 판단하는 자리만 이것을 본다."""
+        found = await self._collection.find_one(
+            {"userId": user_id, "brandId": brand_id}, {"_id": 1}
+        )
+        return found is not None
 
     async def find_light(self, user_id: str, brand_id: str) -> BrandProfile | None:
         """텍스트 필드만 — 이미지·문서의 base64는 **Mongo에서부터 읽지 않는다.**
@@ -100,7 +122,8 @@ class MongoBrandRepository:
         먼저 열고 첨부는 뒤따라 받는다.
         """
         document = await self._collection.find_one(
-            {"userId": user_id, "brandId": brand_id}, {"images": 0, "documents": 0}
+            {"userId": user_id, "brandId": brand_id, "deletedAt": None},
+            {"images": 0, "documents": 0},
         )
         if not document:
             return None

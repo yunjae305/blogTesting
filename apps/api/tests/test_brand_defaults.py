@@ -121,23 +121,70 @@ class TestTheScreenKnowsWhichOneIsDefault:
 
 
 @pytest.mark.asyncio
-class TestTheDefaultCannotBeDeleted:
-    async def test_deleting_it_says_why_instead_of_quietly_coming_back(self):
-        """지워도 다음 조회에서 되살아난다. 조용히 돌아오면 이유를 알 수 없다."""
+class TestTheDefaultCanBeDeletedForGood:
+    """기본 브랜드도 지울 수 있다(2026-08-20 사용자 요청).
+
+    한동안 막아 두었다. 지워도 다음 조회에서 되살아났기 때문인데, 그건 서버를 고칠
+    일이지 버튼을 숨길 일이 아니었다 — 쓰지 않는 자료를 목록에 계속 두어야 할 이유가
+    없다.
+
+    그래서 **문서를 지우는 대신 지웠다는 표시를 남긴다.** 다시 만들어 주는 자리가 그
+    표시를 보고 손을 뗀다.
+    """
+
+    async def test_it_disappears_and_stays_gone(self):
         api = service()
         await api.list_brand_items("user_1")
+
+        await api.delete_brand("user_1", DEFAULT_BRAND_ID)
+
+        assert await api.list_brands("user_1") == []
+        # 다시 조회해도 되살아나지 않는다 — 이것이 이 방식의 이유다.
+        assert await api.list_brand_items("user_1") == []
+        assert await api.list_brands("user_1") == []
+
+    async def test_reading_it_directly_no_longer_finds_it(self):
+        """앱스튜디오 진입·저장된 글이 이 id로 곧바로 들어오는 길이 있다."""
+        api = service()
+        await api.list_brand_items("user_1")
+        await api.delete_brand("user_1", DEFAULT_BRAND_ID)
+
+        with pytest.raises(BlogTaskError) as caught:
+            await api.get_brand("user_1", DEFAULT_BRAND_ID)
+
+        assert caught.value.code == "NOT_FOUND"
+
+    async def test_deleting_it_twice_says_it_is_gone(self):
+        api = service()
+        await api.list_brand_items("user_1")
+        await api.delete_brand("user_1", DEFAULT_BRAND_ID)
 
         with pytest.raises(BlogTaskError) as caught:
             await api.delete_brand("user_1", DEFAULT_BRAND_ID)
 
-        assert caught.value.code == "VALIDATION_FAILED"
-        assert "삭제할 수 없습니다" in caught.value.message
-        assert len(await api.list_brands("user_1")) == 1
+        assert caught.value.code == "NOT_FOUND"
 
-    async def test_other_brands_delete_as_before(self):
+    async def test_one_account_deleting_it_does_not_touch_another(self):
+        api = service()
+        await api.list_brand_items("user_1")
+        await api.list_brand_items("user_2")
+
+        await api.delete_brand("user_1", DEFAULT_BRAND_ID)
+
+        assert await api.list_brands("user_1") == []
+        assert [b.brand_id for b in await api.list_brands("user_2")] == [DEFAULT_BRAND_ID]
+
+    async def test_other_brands_are_removed_outright(self):
+        """기본 브랜드만 표시를 남긴다. 나머지는 다시 만들어 주는 자리가 없어 그럴 이유가 없다."""
         api = service()
         made = await api.create_brand("user_1", {"name": "다른 회사"})
 
         await api.delete_brand("user_1", made.brand_id)
 
-        assert [b.brand_id for b in await api.list_brands("user_1")] == [DEFAULT_BRAND_ID]
+        assert made.brand_id not in [b.brand_id for b in await api.list_brands("user_1")]
+
+    async def test_an_unknown_brand_is_still_not_found(self):
+        with pytest.raises(BlogTaskError) as caught:
+            await service().delete_brand("user_1", "brand_없는것")
+
+        assert caught.value.code == "NOT_FOUND"

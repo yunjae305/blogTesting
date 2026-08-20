@@ -4071,73 +4071,12 @@ textarea:focus {
   overflow-wrap: anywhere;
 }
 
-/* 결합 가능성 판정. 등급이 곧 색이다 — 글자를 읽기 전에 A와 C가 갈려 보여야 한다. */
-.brand-fit {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-left-width: 4px;
-  border-radius: 10px;
-  background: var(--soft);
-}
-
-.brand-fit[data-grade="A"] {
-  border-left-color: var(--ok);
-}
-
-.brand-fit[data-grade="B"] {
-  border-left-color: var(--warn);
-}
-
-.brand-fit[data-grade="C"] {
-  border-left-color: var(--danger);
-  background: #fdf4f3;
-}
-
-.brand-fit p {
-  margin: 0;
-  font-size: 0.84rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-.brand-fit-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.brand-fit-badge {
-  flex: none;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 0.76rem;
-  font-weight: 700;
-  color: #fff;
-  background: var(--muted);
-}
-
-.brand-fit[data-grade="A"] .brand-fit-badge {
-  background: var(--ok);
-}
-
-.brand-fit[data-grade="B"] .brand-fit-badge {
-  background: var(--warn);
-}
-
-.brand-fit[data-grade="C"] .brand-fit-badge {
-  background: var(--danger);
-}
-
-.brand-fit-reason {
-  font-weight: 600;
-}
-
-.brand-fit-hint,
-.brand-fit-features {
-  color: var(--muted);
+/* '둘 중 하나'라는 배지의 뜻을 받는 줄. 두 칸을 다 본 뒤에 읽히도록 아래에 두고,
+   설명이 아니라 규칙이라 평소 안내보다 조금 진하게 둔다. */
+.brief-pair-note {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
 }
 
 .brief-brand-actions {

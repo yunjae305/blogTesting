@@ -14,11 +14,7 @@ from fastapi.responses import JSONResponse
 from app.errors import AuthError, BlogTaskError
 from app.llm.prompts import split_data_url
 from app.modules.blog_task.validation import validate_additional_drafts
-from app.modules.brand import (
-    evaluate_brand_fit,
-    fit_context_of,
-    with_brand_materials,
-)
+from app.modules.brand import with_brand_materials
 from app.posting.config import naver_config_from_env, naver_profile_dir, remember_blog_id
 from app.posting.credentials import (
     NaverCredentials,
@@ -264,29 +260,6 @@ async def update_brand(request: Request, brand_id: str) -> JSONResponse:
     body = await _json_body(request)
     brand = await _services(request).brand_service.update_brand(user.user_id, brand_id, body)
     return bare(brand.to_wire())
-
-
-@router.post("/brands/{brand_id}/fit")
-async def check_brand_fit(request: Request, brand_id: str) -> JSONResponse:
-    """이 소재에 이 브랜드를 얹는 것이 자연스러운가 — A·B·C(2026-08-19).
-
-    저장할 때도 같은 판정을 하지만(`with_brand_materials`), 화면은 **저장하기 전에**
-    알아야 한다. 억지 조합(C)으로 글을 만들면 되돌릴 수 있는 것은 원고 한 편을 다 만든
-    뒤이고, 그 원고는 광고 문장으로 채워져 있다. 소재를 적는 자리에서 미리 알려 주면
-    사용자는 소재를 바꾸거나 브랜드를 빼는 쪽을 고를 수 있다.
-
-    글을 만들지 않으므로 저장도 하지 않는다 — 순수한 조회다.
-    """
-    user = await _authenticate(request)
-    body = await _json_body(request)
-    profile = await _services(request).brand_service.get_brand(user.user_id, brand_id)
-    topic = body.get("topic")
-    fit = evaluate_brand_fit(
-        profile,
-        topic if isinstance(topic, str) else "",
-        context=fit_context_of(body),
-    )
-    return bare(fit.to_wire())
 
 
 # 브랜드 전용 글 생성 경로(`POST /brands/{id}/posts`와 `.../posts/auto`)는 2026-08-11에

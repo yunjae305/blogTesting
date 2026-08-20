@@ -397,13 +397,14 @@ export function BrandEditor({
     setDraft((prev) => ({ ...prev, [key]: value }));
 
   /**
-   * 지울 수 있는 자료인가. 셋이 모두 참일 때만이다.
+   * 지울 수 있는 자료인가. 이미 저장된 자료이고, 부모가 뒤처리(목록 갱신·선택 해제)를
+   * 할 수 있으면 된다.
    *
-   * - 이미 저장된 자료다(새로 만드는 중에는 지울 것이 없다)
-   * - 부모가 뒤처리를 할 수 있다(`onDeleted` — 목록 갱신과 선택 해제)
-   * - 기본 브랜드가 아니다(서버가 거부한다 — 지워도 다음 조회에서 되살아나므로)
+   * 2026-08-20까지는 기본 브랜드(AIONA)를 뺐다. 지워도 다음 조회에서 되살아났기
+   * 때문인데, 그건 서버를 고칠 일이지 버튼을 숨길 일이 아니었다 — 이제 기본 브랜드도
+   * **지우면 지워진 채로 남는다**(BrandService.delete_brand).
    */
-  const deletable = Boolean(brand && onDeleted && brand.brandId !== DEFAULT_BRAND_ID);
+  const deletable = Boolean(brand && onDeleted);
 
   /** 첨부 칸에 보여줄 대기 안내 한 줄. 개수를 알면 함께 말한다. */
   const pendingNote = attachmentCounts
@@ -553,7 +554,17 @@ export function BrandEditor({
       brand.images.length || brand.documents.length
         ? ` 올려 둔 이미지 ${brand.images.length}장과 문서 ${brand.documents.length}개도 함께 지워집니다.`
         : "";
-    if (!window.confirm(`'${brand.name}' 자료를 삭제할까요? 되돌릴 수 없습니다.${attached}`)) {
+    // 기본 브랜드는 되살리는 길이 다르다(스크립트). 지우기 전에 그것을 알려 준다 —
+    // 다시 만들 수 있다고 생각하고 지웠다가 못 되돌리면 안 된다.
+    const restorable =
+      brand.brandId === DEFAULT_BRAND_ID
+        ? " 기본 제공 자료라 화면에서는 다시 만들 수 없습니다(관리자 스크립트로만 복구)."
+        : "";
+    if (
+      !window.confirm(
+        `'${brand.name}' 자료를 삭제할까요? 되돌릴 수 없습니다.${attached}${restorable}`,
+      )
+    ) {
       return;
     }
     setBusy(true);

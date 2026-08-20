@@ -110,12 +110,22 @@ describe("브랜드 자료 삭제", () => {
     expect(deleteButton()).toBeNull();
   });
 
-  it("기본 브랜드에는 삭제 버튼이 없다", async () => {
-    // 서버가 거부한다(지워도 다음 조회에서 되살아나므로). 눌러 봐야 오류만 나는
-    // 버튼을 보여 줄 이유가 없다.
+  it("기본 브랜드도 지울 수 있다", async () => {
+    // 한동안 막아 두었다(2026-08-20에 품). 지워도 되살아나는 것은 서버를 고칠 일이지
+    // 버튼을 숨길 일이 아니었다 — 쓰지 않는 자료를 목록에 계속 둘 이유가 없다.
     await render(brand({ brandId: DEFAULT_BRAND_ID, name: "AIONA" }));
 
-    expect(deleteButton()).toBeNull();
+    expect(deleteButton()).not.toBeNull();
+  });
+
+  it("기본 브랜드는 화면에서 되살릴 수 없다고 미리 말한다", async () => {
+    // 다시 만들 수 있다고 생각하고 지웠다가 못 되돌리면 안 된다.
+    const asked = answerConfirm(false);
+    await render(brand({ brandId: DEFAULT_BRAND_ID, name: "AIONA" }));
+
+    await act(async () => deleteButton()!.click());
+
+    expect(asked[0]).toContain("다시 만들 수 없습니다");
   });
 
   it("묻고 지운다 — 취소하면 아무 일도 일어나지 않는다", async () => {

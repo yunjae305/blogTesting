@@ -180,33 +180,6 @@ function ReferenceIcon({ type }: { type: ReferenceMaterialType }) {
 }
 
 /**
- * 소재 × 브랜드 결합 가능성 판정(`POST /brands/{id}/fit`).
- *
- * `A` 소재가 브랜드 기준표의 상황과 곧바로 닿는다 — 적극적으로 쓴다.
- * `B` 소재를 다루다 보면 그 상황이 생긴다 — 상황을 먼저 만들면 쓸 수 있다.
- * `C` 닿는 곳이 없다 — 억지로 이으면 광고 문장만 남는다.
- */
-type BrandFitResult = {
-  grade: "A" | "B" | "C";
-  reason: string;
-  /** 이 소재에서 쓸 수 있는 기능 이름들. 기준표가 없는 브랜드에서는 비어 있다. */
-  features: string[];
-};
-
-/** 등급마다의 배지 글자와 한 줄 설명. 색은 CSS가 `data-grade`로 고른다. */
-const BRAND_FIT_LABELS: Record<BrandFitResult["grade"], { badge: string; hint: string }> = {
-  A: { badge: "바로 연결", hint: "이 소재는 브랜드를 쓰는 장면을 그대로 담을 수 있습니다." },
-  B: {
-    badge: "상황 필요",
-    hint: "쓸 수 있습니다. 브랜드를 꺼내기 전에 필요해지는 장면을 먼저 만듭니다.",
-  },
-  C: {
-    badge: "억지 연결",
-    hint: "이 조합으로 쓰면 브랜드 문장이 겉돕니다. 소재를 바꾸거나 브랜드를 빼는 편이 낫습니다.",
-  },
-};
-
-/**
  * 브랜드가 이 글에서 맡을 역할을 고르는 칸(2026-08-19).
  *
  * 소재 칸과 브랜드 칸의 잠금을 없애면서 생긴 자리다. 둘을 함께 고를 수 있게 된 순간
@@ -223,7 +196,6 @@ function BrandRoleChoice({
   locked,
   topic,
   onChange,
-  fit,
 }: {
   brandName: string;
   role: "UTILITY" | "FOCUS";
@@ -231,7 +203,6 @@ function BrandRoleChoice({
   locked: boolean;
   topic: string;
   onChange: (next: "UTILITY" | "FOCUS") => void;
-  fit: BrandFitResult | null;
 }) {
   const name = brandName || "브랜드";
   if (locked) {
@@ -274,22 +245,6 @@ function BrandRoleChoice({
         ))}
       </div>
 
-      {/* 결합 가능성. 판정을 받기 전에는 아무것도 그리지 않는다 — 빈 자리를 미리 잡아
-          두면 소재를 치는 동안 화면이 위아래로 흔들린다. */}
-      {fit && (
-        <div className="brand-fit" data-grade={fit.grade}>
-          <p className="brand-fit-head">
-            <span className="brand-fit-badge">{BRAND_FIT_LABELS[fit.grade].badge}</span>
-            <span className="brand-fit-reason">{fit.reason}</span>
-          </p>
-          <p className="brand-fit-hint">{BRAND_FIT_LABELS[fit.grade].hint}</p>
-          {fit.features.length > 0 && (
-            <p className="brand-fit-features">
-              이 소재에서 쓸 기능: {fit.features.join(" · ")}
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -494,42 +449,6 @@ export function StepTopic({
   /** 브랜드가 주인공인 글인가 — 소재 칸을 브랜드 이름이 대신하는 그 글이다. */
   const writingWithBrand = brandPicked && brandMode === "FOCUS";
 
-  // --- 소재 × 브랜드 결합 가능성(2026-08-19) ---
-  //
-  // 얹을 수 있다는 것과 얹어야 한다는 것은 다르다. 브랜드를 쓸 이유가 없는 소재에 억지로
-  // 붙이면 남는 것은 광고 문장뿐이고, 그런 글이 쌓이면 블로그 전체가 홍보 채널로 읽힌다.
-  //
-  // 저장할 때 서버도 같은 판정을 하지만, **저장하기 전에** 알아야 한다 — 저장 뒤에
-  // 알게 되면 되돌릴 수 있는 시점은 원고 한 편을 다 만든 뒤이고, 그 원고는 이미 광고
-  // 문장으로 채워져 있다.
-  const [fit, setFit] = useState<BrandFitResult | null>(null);
-  /** 억지 조합(C)이라도 그대로 쓰겠다고 사용자가 고른 상태. 조합이 바뀌면 풀린다. */
-  const [fitOverridden, setFitOverridden] = useState(false);
-
-  const fitTopic = topic.trim();
-  const fitSubject = subjectCategory ?? "";
-  const fitPurpose = customPurpose.trim() || purpose;
-  useEffect(() => {
-    // 브랜드가 주인공인 글에는 물을 것이 없다 — 소재가 곧 브랜드다.
-    if (!brandId || !fitTopic || brandMode !== "UTILITY") {
-      setFit(null);
-      return;
-    }
-    setFitOverridden(false);
-    // 글자를 치는 동안 매 글자마다 묻지 않는다. 판정은 저장을 막는 값이 아니라 **미리
-    // 알려 주는 값**이라, 손이 멈춘 뒤에 한 번이면 충분하다.
-    const timer = setTimeout(() => {
-      void request<BrandFitResult>(`/brands/${encodeURIComponent(brandId)}/fit`, {
-        method: "POST",
-        body: { topic: fitTopic, subjectCategory: fitSubject, purpose: [fitPurpose] },
-      })
-        .then(setFit)
-        // 판정을 못 받았다고 소재 입력을 막지 않는다. 없으면 예전처럼 그냥 쓰는 것이다.
-        .catch(() => setFit(null));
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [brandId, brandMode, fitPurpose, fitSubject, fitTopic]);
-
   function fillSample() {
     setTopic(SAMPLE_INPUT.topic);
     setPurpose(SAMPLE_INPUT.purpose);
@@ -692,20 +611,6 @@ export function StepTopic({
     }
     if (ageRange === null) {
       showToast("대상 연령을 선택해 주세요. 상관없으면 '전체'를 골라주세요.", true);
-      return;
-    }
-    // 억지 조합(C)은 한 번 막는다(2026-08-19 사용자 지시: "C를 버리는 것이 중요하다").
-    //
-    // **막되, 끝까지 막지는 않는다.** 판정은 브랜드 자료의 기준표로 재는 것이라 표에 아직
-    // 없는 상황은 C로 나온다 — 그때 사용자가 할 일은 기준표를 채우거나, 그 판단이 틀렸다고
-    // 보고 그대로 쓰는 것이다. 두 번째 저장에서 넘어가게 두면 둘 다 할 수 있다.
-    if (fit?.grade === "C" && !fitOverridden) {
-      setFitOverridden(true);
-      showToast(
-        `이 소재와 브랜드는 자연스럽게 이어지지 않습니다. ${fit.reason}` +
-          " 그대로 쓰려면 한 번 더 눌러 주세요.",
-        true,
-      );
       return;
     }
     // 탭 안에 작성만 하고 '추가'하지 않은 값은 오른쪽 목록에 없으므로 저장 대상이 아니다.
@@ -884,17 +789,21 @@ export function StepTopic({
               <div className="field brief-topic-field">
                 <div className="field-label-row">
                   <label htmlFor="topic">소재</label>
-                  {/* 브랜드만 골라 쓰는 글에서는 소재가 필수가 아니다 — 등록해 둔 브랜드
-                      소개·핵심 기능이 그 자리를 대신한다. 그 외에는 언제나 필수다: 소재가
-                      곧 독자가 검색해서 들어오는 말이다. */}
+                  {/* **소재와 브랜드 중 하나는 있어야** 넘어간다. 둘 다 '선택'으로 적어
+                      두었더니 아무것도 안 채워도 되는 줄 알았다는 지적이 있었다
+                      (2026-08-20). 그렇다고 소재만 '필수'로 두면 이번엔 브랜드만 골라
+                      쓰는 길이 안 보인다 — 그래서 두 칸에 같은 배지를 달고, 아래 한 줄이
+                      무슨 뜻인지 말한다.
+
+                      한쪽이 채워지면 다른 쪽은 정말 선택이므로 그때는 '선택'으로 바뀐다. */}
                   <span className={`field-badge ${brandPicked ? "opt" : "req"}`}>
-                    {brandPicked ? "선택" : "필수"}
+                    {brandPicked ? "선택" : "둘 중 하나"}
                   </span>
                 </div>
                 <p className="field-desc">
                   {brandPicked
                     ? "독자가 검색해서 들어올 말입니다. 비워 두면 아래 브랜드가 글의 주인공이 됩니다."
-                    : `글에서 소개하거나 활용할 핵심 대상입니다. 이름 하나여도 되고, 한 문장으로 적어도 됩니다(최대 ${MAX_TOPIC_CHARS}자).`}
+                    : `독자가 검색해서 들어올 말입니다. 이름 하나여도 되고, 한 문장으로 적어도 됩니다(최대 ${MAX_TOPIC_CHARS}자).`}
                 </p>
                 {/* 길이 제한을 **적는 자리에서** 막는다. 없으면 다 적고 나서 저장할 때
                     서버에 거절당한다.
@@ -918,6 +827,9 @@ export function StepTopic({
             {!fixedTopic && (
               <BrandPicker
                 brandId={brandId}
+                /* 소재가 비어 있으면 이 칸이 그 자리를 대신하므로 '둘 중 하나'다.
+                   소재를 적었으면 브랜드는 정말 곁들이는 것이라 '선택'이다. */
+                badge={hasTopic ? "선택" : "둘 중 하나"}
                 /* 앱스튜디오에서 들어왔으면 그 브랜드를 미리 골라 둔다. **새 글일 때만**
                    보낸다 — 저장된 글에도 보내면, 브랜드를 일부러 뺀 글을 다시 열었을 때
                    그 브랜드가 되붙는다. */
@@ -937,8 +849,17 @@ export function StepTopic({
                     locked={!hasTopic}
                     topic={topic.trim()}
                     onChange={setBrandRole}
-                    fit={brandMode === "UTILITY" ? fit : null}
                   />
+                )}
+
+                {/* 배지의 '둘 중 하나'가 무슨 뜻인지 한 줄로 말한다. 두 칸 사이가 아니라
+                    **아래**에 두는 이유: 두 칸을 다 본 뒤에 읽어야 짝 관계로 읽힌다. */}
+                {!hasTopic && !brandPicked && (
+                  <p className="field-desc brief-pair-note">
+                    소재와 브랜드 중 <strong>하나는 있어야</strong> 다음 단계로 넘어갑니다.
+                    소재를 적으면 그 소재가 글의 주인공이고, 비우고 브랜드만 고르면 그
+                    브랜드를 소개하는 글이 됩니다.
+                  </p>
                 )}
               </BrandPicker>
             )}

@@ -478,6 +478,9 @@ COLLECTIONS: dict[str, dict] = {
                     # 글 맨 끝에 붙는 마무리(사실 한 줄 + 링크). 모양은 애플리케이션
                     # 검증(modules/brand/validation.py)이 지킨다.
                     "closing": {"bsonType": ["object", "null"]},
+                    # 지운 시각(2026-08-20). 기본 브랜드에만 쓰인다 — 문서를 없애면
+                    # 다시 만들어 주는 자리가 되살리므로, 지웠다는 사실만 남긴다.
+                    "deletedAt": {"bsonType": ["string", "null"]},
                     "createdAt": {"bsonType": "string"},
                     "updatedAt": {"bsonType": "string"},
                 },

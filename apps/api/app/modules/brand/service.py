@@ -61,7 +61,10 @@ class BrandService:
         브랜드 id가 사람마다 같은 값으로 고정돼 있어(`DEFAULT_BRAND_ID`), 두 요청이 동시에
         들어와도 같은 문서를 두 번 쓸 뿐 두 벌이 되지 않는다.
         """
-        if await self._repository.find(user_id, DEFAULT_BRAND_ID) is not None:
+        # **지운 것까지 센다.** 사용자가 기본 브랜드를 지웠으면 그 자리에 '지웠다'는
+        # 표시가 남아 있다 — 그것을 못 보면 다음 조회에서 되살아나고, 사용자는 지운 것이
+        # 왜 돌아왔는지 알 수 없다.
+        if await self._repository.exists(user_id, DEFAULT_BRAND_ID):
             return
         stamp = now_iso()
         await self._repository.upsert(
@@ -129,14 +132,26 @@ class BrandService:
         )
 
     async def delete_brand(self, user_id: str, brand_id: str) -> None:
-        # 기본 브랜드는 지워도 다음 조회에서 다시 생긴다. 조용히 되살아나면 사용자는
-        # 지운 것이 왜 돌아왔는지 알 수 없으므로, 지워지지 않는다고 말한다.
+        """브랜드 자료를 지운다. 기본 브랜드도 지울 수 있다(2026-08-20 사용자 요청).
+
+        다만 지우는 **방식**이 다르다. 기본 브랜드는 없으면 다시 만들어 주는 자리가
+        있어서(`ensure_default_brands`) 문서를 없애면 다음 조회에서 되살아난다 — 그래서
+        문서를 지우는 대신 **지웠다는 표시를 남긴다.** 목록·조회에서는 없는 것으로 다루고,
+        다시 만들어 주지도 않는다.
+
+        되살리려면 `scripts/seed_aiona_brand.py --apply`를 쓴다.
+        """
         if brand_id == DEFAULT_BRAND_ID:
-            raise BlogTaskError(
-                "VALIDATION_FAILED",
-                "기본 제공 브랜드 자료는 삭제할 수 없습니다."
-                " 쓰지 않으려면 글을 쓸 때 고르지 않으면 됩니다.",
+            existing = await self._repository.find(user_id, brand_id)
+            if existing is None:
+                raise BlogTaskError(
+                    "NOT_FOUND", f"브랜드 자료 {brand_id}를 찾을 수 없습니다."
+                )
+            stamp = now_iso()
+            await self._repository.upsert(
+                existing.model_copy(update={"deleted_at": stamp, "updated_at": stamp})
             )
+            return
         if not await self._repository.delete(user_id, brand_id):
             raise BlogTaskError("NOT_FOUND", f"브랜드 자료 {brand_id}를 찾을 수 없습니다.")
 

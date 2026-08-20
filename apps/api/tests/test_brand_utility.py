@@ -193,7 +193,7 @@ class TestSeventyTwentyTen:
         assert "어떤 기능을 썼는지" in text
         assert "무엇을 얻었는지" in text
 
-    def test_only_real_feature_names_are_allowed(self):
+    def test_the_matched_rows_are_offered_first(self):
         text = "\n".join(
             brand_utility_rules(
                 utility_input(brand_use_cases=["- 어떤 정보를 알아보고 싶을 때 → 자료 조사"])
@@ -201,13 +201,38 @@ class TestSeventyTwentyTen:
         )
 
         assert "- 어떤 정보를 알아보고 싶을 때 → 자료 조사" in text
-        assert "이 이름 그대로" in text
+        assert "먼저 맞춰 본 기능" in text
 
-    def test_without_a_table_it_refuses_to_invent_names(self):
+    def test_the_matched_rows_are_a_hint_not_a_fence(self):
+        """기준표는 글자 맞춤이고 소재는 사람 말이다 — '노트북'은 '가격'과 닿지 않는다.
+
+        닿은 줄만 쓰라고 하면 표에 적어 두지 않은 낱말이 소재로 들어왔을 때 브랜드를
+        아예 못 쓴다(2026-08-20 사용자 지시). 참고자료에는 브랜드 자료 **전체**가 들어
+        있으므로 그 안에서 골라도 된다.
+        """
+        text = "\n".join(
+            brand_utility_rules(
+                utility_input(brand_use_cases=["- 어떤 정보를 알아보고 싶을 때 → 자료 조사"])
+            )
+        )
+
+        assert "출발점이지 허용 목록이 아니다" in text
+        assert "소재·트렌드 키워드와 관련된 기능이 브랜드 자료에 있으면" in text
+
+    def test_without_a_matching_row_it_still_lets_the_brand_in(self):
+        """글자가 안 닿았을 뿐, 정말 무관한지는 자료를 읽어야 안다."""
         text = "\n".join(brand_utility_rules(utility_input(brand_use_cases=[])))
 
-        assert "참고자료의 브랜드 자료에 적힌 것만" in text
-        assert "기능명을 만들어 붙이지 말고" in text
+        assert "그렇다고 브랜드를 못 쓰는 것은 아니다" in text
+        assert "억지로 넣지 않는다" in text
+
+    def test_inventing_a_feature_name_is_still_banned(self):
+        """자료에서 골라 써도 된다는 자유가 **이름을 지어내도 된다**로 읽히면 안 된다."""
+        for cases in ([], ["- 어떤 정보를 알아보고 싶을 때 → 자료 조사"]):
+            text = "\n".join(brand_utility_rules(utility_input(brand_use_cases=cases)))
+
+            assert "AIONA 자료에 적혀 있는 것만" in text, cases
+            assert "이름을 만들어 붙이지 말고" in text, cases
 
     def test_a_b_grade_asks_for_the_situation_first(self):
         text = "\n".join(brand_utility_rules(utility_input(brand_fit_grade=BRAND_FIT_SITUATIONAL)))
@@ -537,19 +562,6 @@ class TestSavingAPostDecidesTheRole:
         assert saved["topic"] == "AIONA"
         # 브랜드가 주인공인 글에는 결합 가능성을 묻지 않는다 — 소재가 곧 브랜드다.
         assert "brandFitGrade" not in saved
-
-    async def test_the_fit_endpoint_answers_before_saving(self):
-        """저장 뒤에 알면 되돌릴 수 있는 시점은 원고를 다 만든 뒤다."""
-        client, profile, headers = await self._client_and_brand()
-        async with client:
-            response = await client.post(
-                f"/brands/{profile.brand_id}/fit",
-                json={"topic": "강아지 산책 코스", "subjectCategory": "여행·장소"},
-                headers=headers,
-            )
-
-        assert response.status_code == 200, response.text
-        assert response.json()["grade"] == "C"
 
     async def test_a_post_with_no_brand_carries_no_role(self):
         client, _profile, headers = await self._client_and_brand()

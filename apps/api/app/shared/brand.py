@@ -267,6 +267,15 @@ class BrandProfile(CamelModel):
     images: list[BrandImage] = []
     created_at: str
     updated_at: str
+    #: 지운 시각(2026-08-20). **기본 브랜드에만 쓰인다.**
+    #:
+    #: 다른 브랜드는 지우면 문서가 사라진다. 기본 브랜드(AIONA)는 없으면 다시 만들어 주는
+    #: 자리가 있어서(`ensure_default_brands`), 문서를 지우면 다음 조회에서 되살아난다 —
+    #: 사용자는 지운 것이 왜 돌아왔는지 알 수 없다. 그래서 **지웠다는 사실만 남긴다.**
+    #: 목록·조회에서는 없는 것으로 다루고, 다시 만들어 주지도 않는다.
+    #:
+    #: 되살리려면 `scripts/seed_aiona_brand.py --apply`를 쓴다.
+    deleted_at: str | None = None
 
 
 class BrandListItem(CamelModel):
