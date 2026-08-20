@@ -722,13 +722,26 @@ class TestEveryRepositoryKeepsThePromise:
             assert not missing, f"{repository.__name__}에 없다: {missing}"
 
     def test_the_service_only_calls_what_the_repositories_have(self):
-        """서비스가 부르는 저장소 메서드가 실제로 있는지."""
+        """서비스가 부르는 저장소 메서드가 실제로 있는지.
+
+        경로는 **이 파일에서부터** 짚는다. 예전에는 실행 위치를 기준으로 잡아
+        (`app/modules/...`) `apps/api`에서 돌릴 때만 통과했다 — README가 안내하는
+        `npm test`는 저장소 루트에서 pytest를 부르므로 거기서는 이 테스트가 죽었다.
+        """
         import re
         from pathlib import Path
 
         from app.modules.blog_task.repository import InMemoryBlogTaskRepository
 
-        source = Path("app/modules/blog_task/service.py").read_text(encoding="utf-8")
+        # tests/ -> apps/api -> app/modules/blog_task/service.py
+        service_file = (
+            Path(__file__).resolve().parents[1]
+            / "app"
+            / "modules"
+            / "blog_task"
+            / "service.py"
+        )
+        source = service_file.read_text(encoding="utf-8")
         called = set(re.findall(r"self\._repository\.(\w+)", source))
         missing = [name for name in sorted(called) if not hasattr(InMemoryBlogTaskRepository, name)]
 

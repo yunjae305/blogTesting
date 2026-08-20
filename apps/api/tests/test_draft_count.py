@@ -53,10 +53,17 @@ class TestTheCountHasABound:
             validate_draft_count(bad)
 
     def test_the_client_and_the_server_agree_on_the_bound(self):
-        """화면 상수와 어긋나면 화면은 통과시키고 서버가 거부한다."""
+        """화면 상수와 어긋나면 화면은 통과시키고 서버가 거부한다.
+
+        경로는 **이 파일에서부터** 짚는다. 예전에는 실행 위치를 기준으로 잡아
+        (`../web/src/constants.ts`) `apps/api`에서 돌릴 때만 통과했다 — README가 안내하는
+        `npm test`는 저장소 루트에서 pytest를 부르므로 거기서는 이 테스트가 죽었다.
+        어디서 돌리든 같은 파일을 봐야 한다.
+        """
         from pathlib import Path
 
-        source = Path("../web/src/constants.ts").resolve()
+        # tests/ -> apps/api -> apps -> apps/web/src/constants.ts
+        source = Path(__file__).resolve().parents[2] / "web" / "src" / "constants.ts"
         text = source.read_text(encoding="utf-8")
         assert f"MAX_DRAFT_COUNT = {MAX_DRAFT_COUNT};" in text
 
