@@ -5882,3 +5882,88 @@ def integration_prompt(
             f"원고(마크다운):\n\n{model_markdown}",
         ]
     )
+
+
+# ------------------------------------------------- 브랜드 사이트 읽기(2026-08-20)
+
+
+SITE_READ_SYSTEM_PROMPT = (
+    "You read a company's own website and report what it says. You never add product "
+    "facts that are not printed on the pages you read. If the site does not say "
+    "something, you leave that field empty."
+    + UNTRUSTED_REFERENCE_SYSTEM_RULE
+)
+
+
+def site_collect_prompt(brand_name: str, urls: list[str]) -> str:
+    """사이트를 훑어 오라는 지시. 정리는 다음 호출이 한다(M3와 같은 두 걸음).
+
+    **읽으라고만 하고 판단은 시키지 않는다.** 이 단계에서 요약까지 시키면 기능 이름이
+    한 번 요약을 거치면서 뭉개진다("리서치 코파일럿" → "논문 검색 기능"). 다음 단계가
+    쓸 것은 사이트에 **적힌 그대로의 글자**다.
+    """
+    listed = "\n".join(f"{index + 1}. {url}" for index, url in enumerate(urls))
+    return "\n".join(
+        [
+            f"다음은 {brand_name}의 공식 사이트다. 아래 주소를 모두 읽어라.",
+            "",
+            listed,
+            "",
+            "읽은 내용을 정리해 보고하라. 지켜야 할 것:",
+            "",
+            "- **제품·기능 이름은 화면에 적힌 글자 그대로** 옮긴다. 풀어 쓰거나 번역하지"
+            " 않는다. 이 이름들이 나중에 글에 그대로 나간다.",
+            "- 각 기능이 **어떤 상황에서 쓰이는 것으로 설명돼 있는지**를 함께 적는다.",
+            "- 요금·크레딧·인원 같은 숫자는 적혀 있는 그대로 옮긴다.",
+            "- 링크를 타고 들어갈 수 있는 하위 페이지(기능 소개·요금·업데이트)가 보이면"
+            " 그것도 읽고, 어느 주소에서 무엇을 봤는지 밝힌다.",
+            "- **사이트에 없는 것은 적지 않는다.** 일반적인 AI 서비스가 보통 무엇을 하는지는"
+            " 이 보고서에 들어갈 내용이 아니다.",
+            "- 읽지 못한 주소가 있으면 그 사실을 적는다.",
+        ]
+    )
+
+
+def brand_import_prompt(brand_name: str, research: str) -> str:
+    """훑어 온 것을 브랜드 자료 모양으로 정리하라는 지시."""
+    return "\n".join(
+        [
+            f"아래는 {brand_name} 공식 사이트에서 읽어 온 내용이다.",
+            "",
+            research,
+            "",
+            "이것을 브랜드 자료로 정리하라.",
+            "",
+            "- `description`: 무엇을 하는 곳인지. 줄글 2~6문장.",
+            "- `features`: 핵심 기능·서비스. 줄글. **사이트에 적힌 이름 그대로** 쓴다.",
+            "- `useCases`: '이런 상황이면 이 기능' 표. `feature`에는 **사이트에 인쇄된"
+            " 기능 이름만** 쓴다 — 없는 이름을 지어내면 그것이 그대로 원고에 실려 독자에게"
+            " 거짓말이 된다. 확신이 없으면 그 줄을 넣지 않는다.",
+            "- `links`: 참고할 만한 페이지.",
+            "",
+            "위 내용에 없는 칸은 **비워 둔다.** 비면 사람이 채우면 되지만, 지어낸 것은"
+            " 아무도 못 고친다.",
+        ]
+    )
+
+
+def feature_brief_prompt(brand_name: str, research: str) -> str:
+    """신기능 페이지 하나를 읽고 글의 출발점으로 바꾸라는 지시."""
+    return "\n".join(
+        [
+            f"아래는 {brand_name}의 기능 소개 페이지에서 읽어 온 내용이다.",
+            "",
+            research,
+            "",
+            "이 페이지가 소개하는 **기능 하나**를 골라 정리하라.",
+            "",
+            "- `name`: 그 기능의 이름. **페이지에 인쇄된 그대로.** 이것이 글의 소재가"
+            " 되므로 설명 문구가 아니라 이름이어야 한다.",
+            "- `summary`: 무엇이 새로운지 2~4문장.",
+            "- `highlights`: 독자가 실제로 무엇을 할 수 있는지 3~6개.",
+            "- `keywords`: 이걸 찾을 때 검색할 만한 말들.",
+            "",
+            "페이지가 여러 기능을 말하면 **가장 앞에 내세운 것** 하나를 고른다.",
+            "페이지에 없는 기능·수치는 쓰지 않는다.",
+        ]
+    )

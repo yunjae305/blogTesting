@@ -42,11 +42,14 @@ from .naver_blog import to_mobile_url
 from .source_quality import drop_blocked_sources
 from .keyword_naturalization import primary_raw_keyword
 from .contracts import (
+    BrandDraft,
+    FeatureBrief,
     KeywordJudgment,
     KeywordRelevanceInput,
     OnResearchCollected,
     OnResearchNote,
     PostImageGenerationInput,
+    SiteReadInput,
     TitleEvaluationInput,
     TitleJudgment,
     TopicGenerationInput,
@@ -105,6 +108,8 @@ from .schemas import (
     RELATION_TYPES,
     RELEVANCE_SCHEMA,
     DRAFT_SCHEMA,
+    GEMINI_BRAND_IMPORT_SCHEMA,
+    GEMINI_FEATURE_BRIEF_SCHEMA,
     GEMINI_INTENT_SCHEMA,
     TITLE_EVALUATION_SCHEMA,
     TITLE_HOOK_STRENGTHS,
@@ -115,6 +120,8 @@ from .schemas import (
     WEB_PHOTO_GATE_SCHEMA,
 )
 from app.shared import (
+    BrandLink,
+    BrandUseCase,
     ContentPlan,
     FinalReviewReport,
     EditorialStylePlan,
@@ -1459,6 +1466,154 @@ class GeminiResearchAnalyzer:
             return self._sources_only_result(
                 analysis_input, sources, successful_reference_urls
             )
+
+
+class GeminiSiteReader:
+    """브랜드의 **자기 사이트**를 읽어 자료로 바꾼다(2026-08-20 사용자 결정).
+
+    M3(`GeminiResearchAnalyzer`)와 같은 두 걸음이고, 같은 이유로 나눠 두었다: 읽는
+    호출은 grounding·url_context가 필요하고, 정리하는 호출은 JSON 스키마에 묶여야 한다.
+
+    **M3와 나눠 둔 이유**는 하는 일이 다르기 때문이다. M3는 "이 소재로 무슨 글을 쓸까"를
+    가르려고 웹 전체를 훑는다. 여기는 **주어진 사이트가 말하는 것만** 옮긴다 — 검색으로
+    찾은 남의 페이지가 섞이면 그 회사가 하지 않는 말이 자기 브랜드 자료로 저장된다.
+
+    자격 증명은 M3와 같은 것을 쓴다. 이것 하나를 위해 새 역할·새 환경변수를 만들면,
+    키를 하나 더 넣지 않았다는 이유로 이 기능만 조용히 죽는다.
+    """
+
+    def __init__(self, collect_role: RoleConfig, summary_role: RoleConfig):
+        self._collect_role = collect_role
+        self._summary_role = summary_role
+        self._collect_key = _required_api_key(collect_role)
+        self._summary_key = _required_api_key(summary_role)
+
+    async def _read(self, site_input: SiteReadInput) -> tuple[str, list[str], list[str]]:
+        """사이트를 훑는다 — (읽어 온 글, 읽힌 주소, 못 읽은 주소).
+
+        붙여넣은 글만 있고 주소가 없으면 **모델을 부르지 않는다.** 이미 글자가 있는데
+        한 번 더 훑을 이유가 없고, 로그인 뒤 공지를 복사해 온 경우가 바로 그렇다.
+        """
+        urls = [url for url in dict.fromkeys(site_input.urls) if is_public_reference_url(url)]
+        pasted = site_input.text.strip()
+        if not urls:
+            if not pasted:
+                raise LiveAdapterError("읽을 주소도, 붙여넣은 글도 없습니다")
+            return pasted, [], []
+
+        payload = await asyncio.wait_for(
+            _post_json(
+                "https://generativelanguage.googleapis.com/v1beta/interactions",
+                {"x-goog-api-key": self._collect_key},
+                {
+                    "model": self._collect_role.model,
+                    "input": prompts.site_collect_prompt(site_input.brand_name, urls),
+                    "system_instruction": prompts.SITE_READ_SYSTEM_PROMPT,
+                    # **google_search를 켜지 않는다.** 이 단계에서 검색이 붙으면 남의
+                    # 페이지가 섞이고, 그 회사가 하지 않는 말이 자기 브랜드 자료로 저장된다.
+                    "tools": [{"type": "url_context"}],
+                    "store": False,
+                    "thinking_config": {"thinking_level": "low"},
+                },
+            ),
+            timeout=RESEARCH_COLLECT_TIMEOUT,
+        )
+        text = extract_gemini_interaction_text(payload)
+        results = extract_gemini_url_context_results(payload)
+        read = [
+            (result.requested_url or result.url)
+            for result in results
+            if result.status == "success"
+        ]
+        failed = [url for url in urls if url not in read]
+        if failed:
+            logger.info("사이트 읽기 | 요청 %d건 | 못 읽음 %d건", len(urls), len(failed))
+        if pasted:
+            # 붙여넣은 글은 **뒤에** 붙인다. 사람이 직접 준 것이라 사이트보다 새로울 수
+            # 있고(공지가 그렇다), 뒤에 두면 정리 단계가 최신으로 읽는다.
+            gap = "\n\n"
+            text = f"{text}{gap}[사용자가 붙여넣은 내용]\n{pasted}"
+        return text, read, failed
+
+    async def _structure(self, prompt: str, schema: dict) -> dict:
+        payload = await _post_json(
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{self._summary_role.model}:generateContent",
+            {"x-goog-api-key": self._summary_key},
+            {
+                "systemInstruction": {"parts": [{"text": prompts.SITE_READ_SYSTEM_PROMPT}]},
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "responseSchema": schema,
+                    # 이미 읽어 온 글을 칸에 나누는 일이다. 길게 숙고할 것이 없다.
+                    "thinkingConfig": {"thinkingLevel": "low"},
+                },
+            },
+        )
+        return extract_json_object(extract_gemini_text(payload))
+
+    async def read_brand(self, site_input: SiteReadInput) -> BrandDraft:
+        research, read, failed = await self._read(site_input)
+        parsed = await self._structure(
+            prompts.brand_import_prompt(site_input.brand_name, research),
+            GEMINI_BRAND_IMPORT_SCHEMA,
+        )
+
+        use_cases: list[BrandUseCase] = []
+        for item in parsed.get("useCases") or []:
+            if not isinstance(item, dict):
+                continue
+            situation = string_value(item.get("situation")).strip()
+            feature = string_value(item.get("feature")).strip()
+            # 한 칸만 채운 줄은 프롬프트에 반쪽짜리 지시로 실린다. 저장 검증도 같은 것을
+            # 버리므로 여기서 먼저 버려 화면이 헛것을 보여 주지 않게 한다.
+            if not situation or not feature:
+                continue
+            use_cases.append(
+                BrandUseCase(
+                    situation=situation,
+                    feature=feature,
+                    keywords=string_array(item.get("keywords")),
+                )
+            )
+
+        links: list[BrandLink] = []
+        for item in parsed.get("links") or []:
+            if not isinstance(item, dict):
+                continue
+            url = string_value(item.get("url")).strip()
+            if not url or not is_public_reference_url(url):
+                continue
+            links.append(BrandLink(label=string_value(item.get("label")).strip(), url=url))
+
+        return BrandDraft(
+            description=string_value(parsed.get("description")).strip(),
+            features=string_value(parsed.get("features")).strip(),
+            use_cases=use_cases,
+            links=links,
+            read_urls=read,
+            failed_urls=failed,
+        )
+
+    async def read_feature(self, site_input: SiteReadInput) -> FeatureBrief:
+        research, read, _failed = await self._read(site_input)
+        parsed = await self._structure(
+            prompts.feature_brief_prompt(site_input.brand_name, research),
+            GEMINI_FEATURE_BRIEF_SCHEMA,
+        )
+        name = string_value(parsed.get("name")).strip()
+        if not name:
+            # 이름을 못 찾으면 글의 소재가 없다. 빈 소재로 글을 만들면 브랜드 이름이 그
+            # 자리를 채워(`with_brand_materials`) 신기능 글이 아니라 회사 소개가 된다.
+            raise LiveAdapterError("이 페이지에서 기능 이름을 찾지 못했습니다")
+        return FeatureBrief(
+            name=name,
+            summary=string_value(parsed.get("summary")).strip(),
+            highlights=string_array(parsed.get("highlights")),
+            keywords=string_array(parsed.get("keywords")),
+            read_urls=read,
+        )
 
 
 class AnthropicTopicGenerator:

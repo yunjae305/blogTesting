@@ -137,7 +137,12 @@ def _assemble(
     )
     # 브랜드 자료. 저장소를 주지 않으면 메모리로 둔다 — Mongo 없이 뜨는 개발 실행에서도
     # 화면이 동작해야 한다(다른 저장소와 같은 규칙).
-    brand_service = BrandService(brand_repository or InMemoryBrandRepository())
+    brand_service = BrandService(
+        brand_repository or InMemoryBrandRepository(),
+        # 브랜드 사이트를 읽어 자료를 채워 주는 쪽(2026-08-20). 자격 증명이 없으면 None이고
+        # 그때는 화면이 "지금은 못 쓴다"고 알린다 — 나머지 기능은 그대로 돈다.
+        site_reader=llm.site_reader,
+    )
 
     # 예약 포스팅이 이 셋을 그대로 받아 써야 해서 먼저 만든다 — 예약은 별도의 생성기를
     # 두지 않고 새 글 작성과 **같은 인스턴스**를 부른다. 인스턴스를 따로 만들면 같은 글을

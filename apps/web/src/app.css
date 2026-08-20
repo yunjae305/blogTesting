@@ -14107,6 +14107,62 @@ button.scheduled-check:disabled {
   color: var(--text);
 }
 
+/* 신기능으로 쓰기(2026-08-20). 브랜드 역할 고르기 바로 아래에 서고, 평소에는 버튼
+   하나로 접혀 있다 — 신기능 글은 가끔 쓰는 것이라 늘 펼쳐 두면 소재 칸을 밀어낸다. */
+.brief-new-feature {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.brief-new-feature-toggle {
+  align-self: flex-start;
+}
+
+.brief-new-feature input,
+.brief-new-feature textarea {
+  min-width: 0;
+  width: 100%;
+  font: inherit;
+}
+
+.brief-new-feature textarea {
+  resize: vertical;
+}
+
+/* 사이트에서 자료 가져오기(2026-08-20). 자료 칸 사이에 서므로 테두리로 묶어
+   '여기서부터는 다른 일'이라고 알린다 — 아래 칸들은 손으로 적는 곳이고 여기는 채워
+   주는 곳이다. */
+.brand-site-import {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface-muted, transparent);
+}
+
+.brand-site-import-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.brand-site-import-head .brand-field-label {
+  margin: 0;
+}
+
+.brand-site-import input,
+.brand-site-import textarea {
+  min-width: 0;
+  width: 100%;
+  font: inherit;
+}
+
+.brand-site-import textarea {
+  resize: vertical;
+}
+
 .brand-closing-row {
   display: grid;
   grid-template-columns: minmax(0, 0.6fr) minmax(0, 1fr);

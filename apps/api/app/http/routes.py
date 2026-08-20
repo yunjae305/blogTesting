@@ -262,6 +262,36 @@ async def update_brand(request: Request, brand_id: str) -> JSONResponse:
     return bare(brand.to_wire())
 
 
+@router.post("/brands/{brand_id}/read-site")
+async def read_brand_site(request: Request, brand_id: str) -> JSONResponse:
+    """브랜드의 자기 사이트를 읽어 자료를 **제안**한다(2026-08-20 사용자 결정).
+
+    **저장하지 않는다.** 편집 화면의 칸을 채워 줄 뿐이고, 저장은 사람이 보고 누른다 —
+    사이트가 말하지 않는 기능 이름이 있기 때문이다(BrandService.read_site 참고).
+
+    주소를 주지 않으면 브랜드에 등록된 주소를 읽는다. 로그인 뒤에 있어 서버가 못 여는
+    페이지는 `text`로 붙여넣으면 같은 길로 흐른다.
+    """
+    user = await _authenticate(request)
+    body = await _json_body(request)
+    proposed = await _services(request).brand_service.read_site(user.user_id, brand_id, body)
+    return bare(proposed)
+
+
+@router.post("/brands/{brand_id}/read-feature")
+async def read_brand_feature(request: Request, brand_id: str) -> JSONResponse:
+    """신기능 페이지(또는 붙여넣은 공지)를 읽어 **글의 출발점**으로 바꾼다.
+
+    돌려주는 것은 기능 이름·요약·키워드다. 화면이 그것으로 소재 칸을 채우고 주소를
+    참고자료에 넣는다 — 글을 여기서 만들지는 않는다. 만드는 길은 하나여야 한다
+    (`POST /posts`).
+    """
+    user = await _authenticate(request)
+    body = await _json_body(request)
+    brief = await _services(request).brand_service.read_feature(user.user_id, brand_id, body)
+    return bare(brief)
+
+
 # 브랜드 전용 글 생성 경로(`POST /brands/{id}/posts`와 `.../posts/auto`)는 2026-08-11에
 # 없앴다. 브랜드는 이제 별도 화면이 아니라 **새 글 작성 소재 단계의 선택 항목**이고,
 # 글은 `POST /posts`가 만들고, 브랜드 자료는 `with_brand_materials`가 얹는다

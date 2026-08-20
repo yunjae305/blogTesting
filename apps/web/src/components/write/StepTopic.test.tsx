@@ -499,7 +499,16 @@ describe("StepTopic 소재 분야와 브랜드", () => {
     mocks.store.task = null;
     mocks.collectReferenceMaterials.mockResolvedValue([]);
     mocks.request.mockImplementation(async (path: string) =>
-      path.startsWith("/brands")
+      // 신기능 읽기(2026-08-20)는 목록이 아니라 읽어 온 기능 하나를 돌려준다.
+      path.endsWith("/read-feature")
+        ? {
+            name: "리서치 코파일럿",
+            summary: "논문을 찾고 비교합니다.",
+            highlights: ["선행연구 비교"],
+            keywords: ["논문", "학술"],
+            readUrls: ["https://aiona.kr/research"],
+          }
+        : path.startsWith("/brands")
         ? [
             {
               brandId: "brand_1",
@@ -725,6 +734,93 @@ describe("StepTopic 소재 분야와 브랜드", () => {
 
     expect(savedBody()?.brandMode).toBe("FOCUS");
     expect(savedBody()?.topic).toBe("");
+  });
+
+  it("신기능을 읽어 오면 그 기능 이름이 소재가 되고 브랜드가 주인공이 된다", async () => {
+    // 2026-08-20 사용자 결정: 신기능 페이지를 읽어 글을 쓴다. 기능 이름을 사람이 알고
+    // 정확히 적어야 했던 문제가 여기서 없어진다.
+    await render();
+    await pickBrand();
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".brief-new-feature-toggle")
+        ?.click();
+    });
+    const url = container.querySelector<HTMLInputElement>(
+      "input[aria-label='신기능 페이지 주소']",
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")
+        ?.set?.call(url, "https://aiona.kr/research");
+      url.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("#readFeature")?.click();
+    });
+
+    expect(container.querySelector<HTMLInputElement>("#topic")?.value).toBe(
+      "리서치 코파일럿",
+    );
+    const on = container.querySelector(".brand-role-choice.is-on");
+    expect(on?.textContent).toContain("글의 주인공으로");
+  });
+
+  it("읽어 온 기능 이름은 소재로 **그대로 실려 나간다** — 브랜드 이름으로 덮이지 않는다", async () => {
+    // 브랜드가 주인공인 글은 보통 소재를 비워 보내고 서버가 브랜드 이름으로 채운다.
+    // 신기능 글에 그 규칙을 그대로 쓰면 "리서치 코파일럿"이 "AIONA"로 덮여, 신기능
+    // 소개가 아니라 회사 소개가 나온다.
+    await render();
+    await pickBrand();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".brief-new-feature-toggle")?.click();
+    });
+    const url = container.querySelector<HTMLInputElement>(
+      "input[aria-label='신기능 페이지 주소']",
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")
+        ?.set?.call(url, "https://aiona.kr/research");
+      url.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("#readFeature")?.click();
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(`[data-purpose="${WRITING_PURPOSES[0]}"]`)
+        ?.click();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-reader-age-range=""]')?.click();
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".brief-category-choice")?.click();
+    });
+    await submit();
+
+    expect(savedBody()?.topic).toBe("리서치 코파일럿");
+    expect(savedBody()?.brandMode).toBe("FOCUS");
+  });
+
+  it("읽어 온 주소는 참고자료로 함께 실린다 — 없으면 이름만 알고 내용은 모른다", async () => {
+    await render();
+    await pickBrand();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".brief-new-feature-toggle")?.click();
+    });
+    const url = container.querySelector<HTMLInputElement>(
+      "input[aria-label='신기능 페이지 주소']",
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")
+        ?.set?.call(url, "https://aiona.kr/research");
+      url.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("#readFeature")?.click();
+    });
+
+    expect(container.textContent).toContain("aiona.kr/research");
   });
 
   it("고른 브랜드를 지우면 선택이 풀리고 목록에서도 빠진다", async () => {

@@ -124,6 +124,123 @@ function BrandSection({
  * 여기 적는 것은 **사실**이다. 이 글자는 검수를 거치지 않고 그대로 발행되므로, 가입
  * 조건·크레딧 수가 바뀌면 여기서 고쳐야 한다.
  */
+/**
+ * 사이트에서 읽어 온 브랜드 자료 **제안**(2026-08-20). 서버 `BrandDraft`와 같은 모양.
+ *
+ * 비어 있는 칸은 "사이트에서 못 찾았다"는 뜻이다. 그래서 화면은 **채워진 칸만** 덮어쓴다 —
+ * 못 찾은 것으로 이미 있는 자료를 지우면, 손으로 채워 둔 것이 조용히 사라진다.
+ */
+interface BrandDraftProposal {
+  description: string;
+  features: string;
+  useCases: BrandUseCase[];
+  links: BrandLink[];
+  readUrls: string[];
+  failedUrls: string[];
+}
+
+function SiteImport({
+  brand,
+  busy,
+  onImported,
+}: {
+  brand: BrandProfile | null;
+  busy: boolean;
+  onImported: (proposal: BrandDraftProposal) => void;
+}) {
+  /**
+   * 브랜드의 자기 사이트를 읽어 칸을 채운다(2026-08-20 사용자 결정).
+   *
+   * **저장하지는 않는다.** 읽어 온 것은 제안이고, 사용자가 보고 저장을 누른다 —
+   * 사이트가 말하지 않는 기능 이름이 있기 때문이다(aiona.kr 첫 화면은 큰 기능 여섯 개만
+   * 말하는데 기준표에는 스물여덟 줄이 있다). 통째로 덮으면 그 이름들이 사라지고 모델은
+   * 없어진 이름 대신 지어낸다.
+   *
+   * 붙여넣기 칸이 함께 있는 이유: 공지처럼 **로그인 뒤에 있는 페이지**는 서버가 열면
+   * 로그인 폼만 보인다. 그때는 내용을 복사해 넣으면 같은 길로 흐른다.
+   */
+  const { showToast, reportError } = useStore();
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const [text, setText] = useState("");
+  const [reading, setReading] = useState(false);
+
+  // 새로 만드는 중에는 아직 브랜드가 없다. 읽으려면 어느 브랜드인지가 있어야 한다 —
+  // 읽어 온 것을 "이 브랜드에 대한 말"로 가려 내려면 이름이 필요하기 때문이다.
+  if (!brand) return null;
+
+  async function read() {
+    setReading(true);
+    try {
+      const proposal = await request<BrandDraftProposal>(
+        `/brands/${brand!.brandId}/read-site`,
+        { method: "POST", body: { urls: url.trim() ? [url.trim()] : [], text: text.trim() } },
+      );
+      onImported(proposal);
+      const filled = [
+        proposal.description && "소개",
+        proposal.features && "핵심 기능",
+        proposal.useCases.length > 0 && `기준표 ${proposal.useCases.length}줄`,
+      ].filter(Boolean);
+      showToast(
+        filled.length > 0
+          ? `${filled.join(" · ")}을(를) 채웠습니다. 확인하고 저장해 주세요.`
+          : "사이트에서 채울 만한 내용을 찾지 못했습니다.",
+      );
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setReading(false);
+    }
+  }
+
+  return (
+    <div className="brand-field brand-site-import">
+      <div className="brand-site-import-head">
+        <span className="brand-field-label">사이트에서 가져오기</span>
+        <button
+          className="button"
+          type="button"
+          onClick={() => setOpen((was) => !was)}
+          disabled={busy}
+        >
+          {open ? "접기" : "열기"}
+        </button>
+      </div>
+      {open && (
+        <>
+          <span className="brand-field-hint">
+            공식 사이트를 읽어 아래 칸을 채웁니다. <strong>저장은 직접 누르셔야 합니다</strong> —
+            읽어 온 것을 먼저 확인하세요. 비워 두면 등록된 주소를 읽습니다.
+          </span>
+          <input
+            aria-label="읽을 사이트 주소"
+            placeholder={brand.links[0]?.url || "https://example.com"}
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+          />
+          <textarea
+            aria-label="붙여넣을 내용"
+            placeholder="로그인해야 보이는 페이지는 내용을 여기에 붙여넣어 주세요(선택)."
+            rows={3}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+          />
+          <button
+            className="button"
+            id="readBrandSite"
+            type="button"
+            onClick={() => void read()}
+            disabled={busy || reading}
+          >
+            {reading ? "읽는 중" : "읽어서 채우기"}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function HashtagField({
   value,
   onChange,
@@ -622,6 +739,39 @@ export function BrandEditor({
     }
   }
 
+  /**
+   * 사이트에서 읽어 온 제안을 편집 칸에 붓는다(2026-08-20).
+   *
+   * **채워진 칸만 덮는다.** 못 찾은 칸까지 덮으면 손으로 채워 둔 것이 조용히 사라진다 —
+   * 사이트가 말하지 않는 것이 있다는 게 이 기능의 전제다.
+   *
+   * 기준표와 링크는 **합친다.** 사이트에 있는 줄이 자료에 있는 줄보다 적은 것이 보통이라
+   * (첫 화면은 큰 기능 몇 개만 말한다), 갈아 끼우면 공들여 적은 줄이 날아간다.
+   */
+  function applyProposal(proposal: BrandDraftProposal) {
+    setDraft((current) => {
+      const seenRow = new Set(
+        current.useCases.map((row) => `${row.situation.trim()}|${row.feature.trim()}`),
+      );
+      const seenUrl = new Set(current.links.map((link) => link.url.trim()));
+      return {
+        ...current,
+        description: proposal.description || current.description,
+        features: proposal.features || current.features,
+        useCases: [
+          ...current.useCases,
+          ...proposal.useCases.filter(
+            (row) => !seenRow.has(`${row.situation.trim()}|${row.feature.trim()}`),
+          ),
+        ],
+        links: [
+          ...current.links,
+          ...proposal.links.filter((link) => !seenUrl.has(link.url.trim())),
+        ],
+      };
+    });
+  }
+
   async function save() {
     setBusy(true);
     try {
@@ -848,6 +998,12 @@ export function BrandEditor({
                   onChange={(event) => set("features", event.target.value)}
                 />
               </div>
+
+              <SiteImport
+                brand={brand}
+                busy={busy}
+                onImported={applyProposal}
+              />
 
               <UseCaseTable
                 rows={draft.useCases}

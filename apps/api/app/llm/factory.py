@@ -19,6 +19,7 @@ from .contracts import (
     TopicEvaluator,
     TopicGenerator,
     TrendProvider,
+    SiteReader,
     WebSearchAnalyzer,
 )
 from .live_adapters import (
@@ -27,6 +28,7 @@ from .live_adapters import (
     AnthropicTopicEvaluator,
     AnthropicTopicGenerator,
     GeminiResearchAnalyzer,
+    GeminiSiteReader,
     OpenAiFinalReviewer,
     OpenAiPostImageGenerator,
 )
@@ -114,6 +116,9 @@ class LlmProviders:
     # 그림은 실제로 본다. 없으면 예전처럼 1차 검수 결과만 쓴다 — 이것 때문에 앱이 못 뜨지
     # 않는다(마무리 단계이지 관문이 아니다).
     final_reviewer: object | None
+    # 브랜드 사이트를 읽어 자료를 채워 주는 쪽(있으면). 글을 쓰는 길에 있는 것이 아니라
+    # 자료 입력을 덜어 주는 편의라, 없어도 앱은 그대로 뜬다.
+    site_reader: SiteReader | None
     status: list[RoleStatus]
 
 
@@ -215,6 +220,25 @@ def _resolve_web_search(
         ),
         statuses,
     )
+
+
+def _resolve_site_reader(config: LlmConfig) -> SiteReader | None:
+    """브랜드 사이트를 읽는 쪽(2026-08-20). **M3와 같은 자격 증명을 쓴다.**
+
+    새 역할·새 환경변수를 만들지 않는 이유: 키를 하나 더 넣지 않았다는 이유로 이 기능만
+    조용히 죽는다. M3가 도는 서버라면 이것도 돈다.
+
+    돌 수 없으면 None이다 — blocker에 넣지 않는다. 이것은 글을 쓰는 길에 있는 것이
+    아니라 자료를 채워 주는 편의라, 없다고 서버가 못 뜨면 안 된다. 화면이 "지금은 못
+    쓴다"고 알린다.
+    """
+    collect = _role_or_throw(config, LlmRole.M3_COLLECT)
+    summary = _role_or_throw(config, LlmRole.M3_SUMMARY)
+    if not (collect.has_credentials and summary.has_credentials):
+        return None
+    if collect.provider != M3_COLLECT_PROVIDER or summary.provider != M3_SUMMARY_PROVIDER:
+        return None
+    return GeminiSiteReader(collect, summary)
 
 
 def _resolve_trends(
@@ -357,6 +381,7 @@ def create_llm_providers(config: LlmConfig) -> LlmProviders:
         photo_search=photo_search,
         youtube_photo_search=youtube_photo_search,
         final_reviewer=final_reviewer,
+        site_reader=_resolve_site_reader(config),
         status=[
             trend_status,
             topic_status,

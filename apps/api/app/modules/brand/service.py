@@ -5,7 +5,10 @@
 따로 놀지 않는다.
 """
 
+import logging
+
 from app.errors import BlogTaskError
+from app.llm import SiteReadInput
 from app.modules.blog_task.validation import MAX_REFERENCE_MATERIALS
 from app.shared import (
     AUDIENCE_OTHER,
@@ -23,7 +26,9 @@ from app.shared.ids import new_brand_id
 from .defaults import DEFAULT_BRAND_ID, DEFAULTS_REVISION, default_brand_body
 from .fit import brand_use_case_lines, evaluate_brand_fit, use_case_brief
 from .repository import BrandRepository
-from .validation import validate_brand_body
+from .validation import validate_brand_body, validate_site_read_body
+
+logger = logging.getLogger(__name__)
 
 #: 브랜드 글 하나가 실을 수 있는 참고자료 개수.
 #:
@@ -43,8 +48,66 @@ BRAND_POST_MAX_REFERENCE_MATERIALS = (
 
 
 class BrandService:
-    def __init__(self, repository: BrandRepository):
+    def __init__(self, repository: BrandRepository, site_reader=None):
         self._repository = repository
+        # 브랜드 사이트를 읽어 자료를 채워 주는 쪽(`llm.contracts.SiteReader`, 없으면
+        # None). 자격 증명이 없는 서버에서도 나머지는 그대로 돌아야 해서 선택 항목이다.
+        self._site_reader = site_reader
+
+    async def read_site(self, user_id: str, brand_id: str, raw_body) -> dict:
+        """사이트를 읽어 브랜드 자료를 **제안**한다(2026-08-20 사용자 결정).
+
+        **저장하지 않는다.** 읽어 온 것은 편집 화면의 칸을 채워 줄 뿐이고, 저장은 사람이
+        보고 누른다. 사이트가 말하지 않는 기능 이름이 있기 때문이다 — aiona.kr 첫 화면은
+        큰 기능 여섯 개만 말하는데 기준표에는 스물여덟 줄이 있다. 읽어 온 것으로 통째로
+        덮으면 그 이름들이 조용히 사라지고, 모델은 없어진 이름 대신 **지어낸다.**
+
+        브랜드를 먼저 확인하는 이유는 이름이 필요해서다. "이 사이트가 무엇을 파는 곳인지"
+        가 아니라 "**이 브랜드**에 대해 이 사이트가 무엇을 말하는지"를 읽어야 한다.
+        """
+        profile = await self.get_brand_light(user_id, brand_id)
+        urls, text = validate_site_read_body(raw_body, profile)
+        draft = await self._read_site(
+            SiteReadInput(brand_name=profile.name, urls=urls, text=text)
+        )
+        return draft.model_dump(by_alias=True)
+
+    async def read_feature(self, user_id: str, brand_id: str, raw_body) -> dict:
+        """신기능 페이지(또는 붙여넣은 공지)를 읽어 **글의 출발점**으로 바꾼다.
+
+        기능 이름을 사람이 알고 있어야 하는 문제가 여기서 없어진다 — 브랜드 자료가 아직
+        그 기능을 모르더라도 글은 써진다. 그래서 자료를 고치는 것과 별개의 통로다.
+        """
+        profile = await self.get_brand_light(user_id, brand_id)
+        urls, text = validate_site_read_body(raw_body, profile)
+        brief = await self._read_feature(
+            SiteReadInput(brand_name=profile.name, urls=urls, text=text)
+        )
+        return brief.model_dump(by_alias=True)
+
+    def _reader(self):
+        if self._site_reader is None:
+            raise BlogTaskError(
+                "SITE_READER_UNAVAILABLE",
+                "사이트에서 자료를 가져오는 기능이 지금 꺼져 있습니다. 자료는 직접 채워 주세요.",
+            )
+        return self._site_reader
+
+    async def _read_site(self, site_input):
+        try:
+            return await self._reader().read_brand(site_input)
+        except BlogTaskError:
+            raise
+        except Exception as error:
+            raise _site_read_failed(error) from error
+
+    async def _read_feature(self, site_input):
+        try:
+            return await self._reader().read_feature(site_input)
+        except BlogTaskError:
+            raise
+        except Exception as error:
+            raise _site_read_failed(error) from error
 
     async def ensure_default_brands(self, user_id: str) -> None:
         """기본 브랜드(AIONA)가 없으면 만든다(2026-08-19).
@@ -207,6 +270,19 @@ class BrandService:
             return
         if not await self._repository.delete(user_id, brand_id):
             raise BlogTaskError("NOT_FOUND", f"브랜드 자료 {brand_id}를 찾을 수 없습니다.")
+
+
+def _site_read_failed(error: Exception) -> BlogTaskError:
+    """읽기 실패를 사용자가 읽을 말로 바꾼다.
+
+    원문을 그대로 보이지 않는다 — provider 이름·모델명·상태코드가 화면에 뜬다. 대신
+    **다음에 무엇을 하면 되는지**를 말한다: 이 기능은 없어도 자료를 손으로 채울 수 있다.
+    """
+    logger.warning("브랜드 사이트 읽기 실패 | %s: %s", type(error).__name__, error)
+    return BlogTaskError(
+        "SITE_READ_FAILED",
+        "사이트를 읽지 못했습니다. 주소가 맞는지 확인하거나, 내용을 직접 붙여넣어 주세요.",
+    )
 
 
 def brand_mode_for(

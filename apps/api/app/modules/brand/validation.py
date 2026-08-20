@@ -7,6 +7,7 @@
 from typing import Any
 
 from app.errors import BlogTaskError
+from app.shared.reference_url import is_public_reference_url
 from app.shared import (
     AUDIENCE_CATALOG,
     BRAND_DOCUMENT_SECTIONS,
@@ -458,3 +459,69 @@ def validate_brand_body(raw_body: Any) -> dict:
             "; ".join(error.message for error in errors),
         )
     return cleaned
+
+
+#: 한 번에 읽을 주소 수. 사이트 한 곳을 훑는 데 이 이상이 필요한 경우는 드물고, 늘리면
+#: 그만큼 한 번의 요청이 길어진다(주소마다 실제 조회가 붙는다).
+MAX_SITE_READ_URLS = 5
+
+#: 붙여넣을 수 있는 글의 길이. 로그인 뒤 공지 한 건을 통째로 복사해도 들어가는 크기다.
+MAX_SITE_READ_TEXT = 20_000
+
+
+def validate_site_read_body(raw_body: Any, profile) -> tuple[list[str], str]:
+    """사이트에서 읽어 오기 요청 → (주소들, 붙여넣은 글).
+
+    **주소를 하나도 주지 않으면 브랜드에 등록된 주소를 쓴다.** 사용자가 매번 자기 회사
+    주소를 다시 적을 이유가 없다 — 이미 자료에 들어 있다.
+
+    주소도 없고 붙여넣은 글도 없으면 읽을 것이 없다는 뜻이라 거절한다. 조용히 빈 제안을
+    돌려주면 화면은 "사이트에 아무것도 없다"로 읽는다.
+    """
+    body = raw_body if isinstance(raw_body, dict) else {}
+    errors: list[BrandValidationError] = []
+
+    raw_urls = body.get("urls")
+    if isinstance(raw_urls, str):
+        raw_urls = [raw_urls]
+    urls: list[str] = []
+    for item in raw_urls if isinstance(raw_urls, list) else []:
+        if not isinstance(item, str):
+            continue
+        url = item.strip()
+        if not url or url in urls:
+            continue
+        if not is_public_reference_url(url):
+            errors.append(
+                _error("urls", "INVALID_URL", f"읽을 수 없는 주소입니다: {url[:80]}")
+            )
+            continue
+        urls.append(url)
+
+    text = body.get("text")
+    text = text.strip()[:MAX_SITE_READ_TEXT] if isinstance(text, str) else ""
+
+    # 주소를 주지 않았으면 브랜드에 등록된 주소로 대신한다.
+    if not urls and not text:
+        urls = [
+            link.url
+            for link in getattr(profile, "links", [])
+            if is_public_reference_url(link.url)
+        ]
+
+    if len(urls) > MAX_SITE_READ_URLS:
+        urls = urls[:MAX_SITE_READ_URLS]
+
+    if not urls and not text:
+        errors.append(
+            _error(
+                "urls",
+                "REQUIRED",
+                "읽을 주소가 없습니다. 사이트 주소를 적거나 내용을 붙여넣어 주세요.",
+            )
+        )
+    if errors:
+        raise BlogTaskError(
+            "VALIDATION_FAILED", "; ".join(error.message for error in errors)
+        )
+    return urls, text

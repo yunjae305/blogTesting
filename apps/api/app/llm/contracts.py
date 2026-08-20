@@ -7,6 +7,8 @@ from pydantic import Field, model_validator
 from app.shared import (
     normalized_subject_fields,
     BlogTaskInput,
+    BrandLink,
+    BrandUseCase,
     CamelModel,
     CardBrief,
     CardDesignSystem,
@@ -344,3 +346,76 @@ class DraftGenerator(Protocol):
 
 class PostImageGenerator(Protocol):
     async def generate_post_image(self, input: PostImageGenerationInput) -> GeneratedPostImage: ...
+
+
+# ---------------------------------------------------------------------------
+# 브랜드 자료를 **사이트에서 읽어 온다**(2026-08-20 사용자 결정).
+#
+# 그때까지 브랜드 자료는 사람이 손으로 채우는 것뿐이었다. 그래서 두 가지가 늘 늦었다 —
+# 처음 채우는 품이 컸고, 신기능이 나와도 누군가 자료를 고쳐 주기 전에는 글에 나오지
+# 않았다. 사이트에는 그 내용이 이미 다 있는데.
+#
+# **자료를 대신하지는 않는다.** 읽어 온 것은 *제안*이고, 저장은 사람이 확인하고 누른다.
+# 사이트가 말하지 않는 기능 이름이 있기 때문이다(aiona.kr 첫 화면은 큰 기능 6개만 말하고,
+# 기준표에는 28줄이 있다). 읽어 온 것으로 통째로 덮으면 그 이름들이 조용히 사라지고,
+# 모델은 없어진 이름 대신 **지어낸다** — 기준표를 만든 이유가 바로 그것이었다.
+# ---------------------------------------------------------------------------
+
+
+class SiteReadInput(CamelModel):
+    """읽을 것. 주소든 붙여넣은 글이든, 또는 둘 다.
+
+    **붙여넣기 통로가 필요한 이유**(2026-08-20): AIONA의 업데이트 공지는
+    `winz.aiona.kr/support?tab=announcements`에 올라오는데 그 페이지는 **로그인 뒤에**
+    있다. 서버가 열면 로그인 폼만 보인다. 자격 증명을 서버에 심는 것은 별개의 결정이라,
+    그때까지는 사용자가 공지 내용을 복사해 붙이면 같은 길로 흘러가게 해 둔다.
+
+    공개 페이지(aiona.kr)는 주소만으로 읽힌다 — 그쪽은 이 통로가 필요 없다.
+    """
+
+    brand_name: str
+    urls: list[str] = []
+    #: 붙여넣은 글. 있으면 이것도 함께 읽는다.
+    text: str = ""
+
+
+class BrandDraft(CamelModel):
+    """사이트에서 읽어 낸 브랜드 자료 **제안**. 저장 모양(`validate_brand_body`)과 같다.
+
+    비어 있는 칸은 "사이트에서 못 찾았다"는 뜻이다. 화면은 채워진 칸만 덮어쓴다 —
+    못 찾은 것으로 이미 있는 자료를 지우면 안 된다.
+    """
+
+    description: str = ""
+    features: str = ""
+    use_cases: list[BrandUseCase] = []
+    links: list[BrandLink] = []
+    #: 실제로 읽힌 주소와 못 읽은 주소. 화면이 "무엇을 보고 채웠는지" 보여 줄 근거다.
+    read_urls: list[str] = []
+    failed_urls: list[str] = []
+
+
+class FeatureBrief(CamelModel):
+    """신기능 한 가지를 소개하는 글의 출발점(2026-08-20).
+
+    신기능 페이지 주소만 주면 그 글의 **소재**가 된다. 기능 이름을 사람이 알고 있어야
+    하는 문제가 여기서 없어진다 — 자료가 아직 그 기능을 모르더라도 글은 써진다.
+    """
+
+    #: 글의 소재가 될 기능 이름. 사이트에 적힌 그대로다.
+    name: str
+    #: 무엇이 새로운지 두세 줄.
+    summary: str = ""
+    #: 이 기능으로 무엇을 할 수 있는지. 본문 뼈대가 된다.
+    highlights: list[str] = []
+    #: 검색해 들어올 만한 말들. 제목·해시태그의 출발점이다.
+    keywords: list[str] = []
+    read_urls: list[str] = []
+
+
+class SiteReader(Protocol):
+    """브랜드 사이트를 읽는 쪽. 없으면(자격 증명 없음) 화면이 '지금은 못 쓴다'고 알린다."""
+
+    async def read_brand(self, input: SiteReadInput) -> BrandDraft: ...
+
+    async def read_feature(self, input: SiteReadInput) -> FeatureBrief: ...

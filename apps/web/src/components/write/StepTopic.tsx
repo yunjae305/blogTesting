@@ -190,6 +190,105 @@ function ReferenceIcon({ type }: { type: ReferenceMaterialType }) {
  * "트렌드 글에 우리 서비스를 자연스럽게" 쪽이고, 브랜드가 주인공인 글은 **소재를 비우는
  * 것**으로 이미 표현할 수 있다.
  */
+/** 신기능 페이지를 읽어 온 결과. 서버 `FeatureBrief`와 같은 모양. */
+interface FeatureBriefResult {
+  name: string;
+  summary: string;
+  highlights: string[];
+  keywords: string[];
+  readUrls: string[];
+}
+
+function NewFeatureImport({
+  brandId,
+  brandName,
+  disabled,
+  onLoaded,
+}: {
+  brandId: string;
+  brandName: string;
+  disabled: boolean;
+  onLoaded: (brief: FeatureBriefResult, url: string) => void;
+}) {
+  /**
+   * 신기능 페이지 하나를 읽어 **글의 소재**로 만든다(2026-08-20 사용자 결정).
+   *
+   * 이 칸이 있기 전에는 신기능 글을 쓰려면 기능 이름을 사람이 알고 정확히 적어야 했다.
+   * 브랜드 자료가 아직 그 기능을 모르면(새로 나왔으니 당연하다) 모델이 이름을 지어내거나
+   * 옛 기능으로 대신 썼다. 페이지를 읽어 **적힌 이름 그대로** 소재에 넣으면 그 두 가지가
+   * 함께 없어진다.
+   *
+   * 붙여넣기 칸이 함께 있는 이유: AIONA의 업데이트 공지 목록은 공개 주소로 열려도
+   * 로그인 뒤에만 보인다(`aiona.kr/announcements`의 "전체 공지사항은 로그인 후 확인할 수
+   * 있습니다"). 그때는 공지 내용을 복사해 넣으면 같은 길로 흐른다.
+   */
+  const { showToast, reportError } = useStore();
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const [text, setText] = useState("");
+  const [reading, setReading] = useState(false);
+
+  async function read() {
+    setReading(true);
+    try {
+      const brief = await request<FeatureBriefResult>(`/brands/${brandId}/read-feature`, {
+        method: "POST",
+        body: { urls: url.trim() ? [url.trim()] : [], text: text.trim() },
+      });
+      onLoaded(brief, url.trim());
+      showToast(`'${brief.name}'을(를) 소재로 넣었습니다.`);
+      setOpen(false);
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setReading(false);
+    }
+  }
+
+  return (
+    <div className="brief-new-feature">
+      <button
+        className="button brief-new-feature-toggle"
+        type="button"
+        onClick={() => setOpen((was) => !was)}
+        disabled={disabled}
+      >
+        {open ? "접기" : `${brandName || "브랜드"} 신기능으로 쓰기`}
+      </button>
+      {open && (
+        <>
+          <p className="field-desc">
+            기능 소개 페이지 주소를 넣으면 <strong>거기 적힌 기능 이름</strong>을 소재로
+            가져옵니다. 로그인해야 보이는 공지는 내용을 붙여넣어 주세요.
+          </p>
+          <input
+            aria-label="신기능 페이지 주소"
+            placeholder="https://aiona.kr/..."
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+          />
+          <textarea
+            aria-label="붙여넣을 공지 내용"
+            placeholder="공지 내용을 붙여넣어도 됩니다(선택)."
+            rows={3}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+          />
+          <button
+            className="button"
+            id="readFeature"
+            type="button"
+            onClick={() => void read()}
+            disabled={reading || (!url.trim() && !text.trim())}
+          >
+            {reading ? "읽는 중" : "읽어서 소재로"}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function BrandRoleChoice({
   brandName,
   role,
@@ -446,8 +545,21 @@ export function StepTopic({
     saved?.brandMode === "FOCUS" ? "FOCUS" : "UTILITY",
   );
   const brandMode: "UTILITY" | "FOCUS" = hasTopic ? brandRole : "FOCUS";
-  /** 브랜드가 주인공인 글인가 — 소재 칸을 브랜드 이름이 대신하는 그 글이다. */
-  const writingWithBrand = brandPicked && brandMode === "FOCUS";
+  /** 사이트에서 읽어 온 기능 이름(2026-08-20). 소재 칸이 이 값 그대로일 때만 쓴다. */
+  const [featureTopic, setFeatureTopic] = useState("");
+  /** 지금 소재가 **이 브랜드의 기능 이름**인가 — 신기능 글이다. */
+  const featureIsTopic = Boolean(featureTopic) && topic.trim() === featureTopic;
+  /** 소재 칸을 **브랜드 이름이 대신하는** 글인가.
+   *
+   * 신기능 글은 여기서 빠진다(2026-08-20). 그 글도 브랜드가 주인공이지만(FOCUS) 소재가
+   * **있다** — "리서치 코파일럿"처럼 브랜드 자신의 기능 이름이다. 그것까지 비워 보내면
+   * 서버가 브랜드 이름으로 덮어("AIONA") 어렵게 읽어 온 기능 이름이 사라지고, 신기능
+   * 소개가 아니라 회사 소개가 나온다.
+   *
+   * 사용자가 소재를 손으로 고치면 다시 평소 규칙으로 돌아간다 — 그때는 읽어 온 기능이
+   * 아니라 사용자가 적은 소재이고, 그 경우의 FOCUS는 예전 그대로 "소재 대신 브랜드"다.
+   */
+  const writingWithBrand = brandPicked && brandMode === "FOCUS" && !featureIsTopic;
 
   function fillSample() {
     setTopic(SAMPLE_INPUT.topic);
@@ -594,6 +706,35 @@ export function StepTopic({
 
   function removeReference(id: string) {
     setReferenceEntries((prev) => prev.filter((entry) => entry.id !== id));
+  }
+
+  /**
+   * 읽어 온 신기능을 소재로 앉힌다(2026-08-20).
+   *
+   * 세 가지를 함께 한다. 하나만 해서는 신기능 글이 되지 않기 때문이다:
+   *
+   * 1. **소재**를 기능 이름으로. 페이지에 적힌 그대로라 모델이 지어낼 여지가 없다.
+   * 2. **브랜드를 주인공으로**(FOCUS). 소재가 곧 이 브랜드의 기능이므로, 도구로 쓰는
+   *    글(UTILITY)이 되면 "이 기능으로 무엇을 했나"가 아니라 "무슨 트렌드에 이 기능을
+   *    곁들였나"가 된다.
+   * 3. **주소를 참고자료로.** 이것이 없으면 원고 단계에서 그 페이지를 다시 읽지 못해,
+   *    기능 이름만 알고 내용은 모르는 글이 나온다.
+   */
+  function applyFeatureBrief(brief: FeatureBriefResult, url: string) {
+    setTopic(brief.name);
+    setFeatureTopic(brief.name);
+    setBrandRole("FOCUS");
+    const source = url || brief.readUrls[0] || "";
+    if (!source) return;
+    const already = referenceEntries.some((entry) => {
+      const view = viewOfReference(entry);
+      return view.type === "URL" && view.detail === source;
+    });
+    if (already) return;
+    setReferenceEntries((prev) => [
+      ...prev,
+      { id: nextReferenceId("url"), kind: "url", value: source },
+    ]);
   }
 
   async function submit(event: FormEvent) {
@@ -849,6 +990,17 @@ export function StepTopic({
                     locked={!hasTopic}
                     topic={topic.trim()}
                     onChange={setBrandRole}
+                  />
+                )}
+
+                {/* 신기능 글(2026-08-20). 브랜드를 고른 뒤에만 나온다 — 어느 브랜드의
+                    기능인지가 정해져야 그 페이지를 '이 브랜드에 대한 말'로 읽는다. */}
+                {brandPicked && (
+                  <NewFeatureImport
+                    brandId={brandId}
+                    brandName={brandName}
+                    disabled={busy}
+                    onLoaded={applyFeatureBrief}
                   />
                 )}
 
