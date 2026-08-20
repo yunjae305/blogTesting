@@ -308,6 +308,17 @@ export const DEFAULT_BLEND_MODE: BlendMode = "trend";
 export const MAX_DRAFT_COUNT = 3;
 
 /**
+ * 기본으로 들어 있는 브랜드 자료의 id(2026-08-19). 서버의 `DEFAULT_BRAND_ID`와 같은 값이다.
+ *
+ * 화면이 이 값을 아는 이유는 하나뿐이다: **삭제 버튼을 내주지 않기 위해서**다. 서버가
+ * 삭제를 거부하므로(지워도 다음 조회에서 되살아나기 때문) 눌러 봐야 오류만 나는 버튼을
+ * 보여 줄 이유가 없다. 지키는 것은 여전히 서버다 — 이 상수는 화면을 정직하게 만들 뿐이다.
+ *
+ * 두 값이 어긋나면 지울 수 없는 브랜드에 삭제 버튼이 뜬다. tests가 둘을 대조한다.
+ */
+export const DEFAULT_BRAND_ID = "brand_aiona";
+
+/**
  * 검증이 만들어 주는 글 방향 후보 수. 서버의 `INTENT_CANDIDATE_COUNT`(llm/schemas.py)와
  * 같은 값이어야 한다 — 화면이 "방향 후보 4개"라고 적는데 서버가 3개를 만들면 거짓이 된다.
  *

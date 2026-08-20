@@ -1,9 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import { request } from "../../api/client";
+import { DEFAULT_BRAND_ID } from "../../constants";
 import { FileDropZone } from "../FileDropZone";
 import { useStore } from "../../store";
 import { referenceUrlProblem } from "../../utils";
+// 삭제 아이콘은 새로 그리지 않는다. 예약 화면의 작업 삭제와 **같은 휴지통**을 쓴다 —
+// 같은 뜻의 버튼이 화면마다 다른 그림이면 사용자가 매번 다시 읽어야 한다.
+import { TrashIcon } from "../scheduled/icons";
 import { AudiencePicker } from "./AudiencePicker";
 import type {
   BrandAudience,
@@ -239,7 +243,7 @@ function UseCaseTable({
                 aria-label={`${index + 1}번째 줄 삭제`}
                 onClick={() => onChange(rows.filter((_row, at) => at !== index))}
               >
-                <IconRemove />
+                <TrashIcon />
               </button>
             </li>
           ))}
@@ -321,6 +325,11 @@ type Props = {
   attachmentCounts?: { images: number; documents: number };
   onSaved: (brand: BrandProfile) => void;
   onCancel: () => void;
+  /**
+   * 이 자료를 지웠다. 주지 않으면 삭제 버튼이 나오지 않는다 — 지운 뒤 목록을 고치고
+   * 고른 값을 풀어 줄 곳이 없으면, 화면에는 없는 브랜드가 골라진 채로 남는다.
+   */
+  onDeleted?: (brandId: string) => void;
 };
 
 type Draft = {
@@ -357,7 +366,14 @@ function toDraft(brand: BrandProfile | null): Draft {
  * 브랜드로 쓰는 글의 재료"라 성격이 다르고, 자료를 고치는 이유가 결국 그 브랜드로 글을
  * 쓰기 위해서라 같은 화면에 있는 편이 오가기 쉽다.
  */
-export function BrandEditor({ brand, attachments, attachmentCounts, onSaved, onCancel }: Props) {
+export function BrandEditor({
+  brand,
+  attachments,
+  attachmentCounts,
+  onSaved,
+  onCancel,
+  onDeleted,
+}: Props) {
   const { showToast, reportError } = useStore();
   const [draft, setDraft] = useState<Draft>(() => toDraft(brand));
   const [busy, setBusy] = useState(false);
@@ -379,6 +395,15 @@ export function BrandEditor({ brand, attachments, attachmentCounts, onSaved, onC
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
+
+  /**
+   * 지울 수 있는 자료인가. 셋이 모두 참일 때만이다.
+   *
+   * - 이미 저장된 자료다(새로 만드는 중에는 지울 것이 없다)
+   * - 부모가 뒤처리를 할 수 있다(`onDeleted` — 목록 갱신과 선택 해제)
+   * - 기본 브랜드가 아니다(서버가 거부한다 — 지워도 다음 조회에서 되살아나므로)
+   */
+  const deletable = Boolean(brand && onDeleted && brand.brandId !== DEFAULT_BRAND_ID);
 
   /** 첨부 칸에 보여줄 대기 안내 한 줄. 개수를 알면 함께 말한다. */
   const pendingNote = attachmentCounts
@@ -511,6 +536,36 @@ export function BrandEditor({ brand, attachments, attachmentCounts, onSaved, onC
     }
     set("links", [...draft.links, { label: "", url: value }]);
     setUrlDraft("");
+  }
+
+  /**
+   * 이 자료를 지운다. **되돌릴 수 없다** — 올려 둔 이미지·문서까지 함께 사라진다.
+   *
+   * 기본 브랜드는 지울 수 없어서 버튼 자체가 나오지 않는다(아래 `deletable`). 서버도
+   * 같은 것을 거부하지만, 눌러 봐야 오류만 나는 버튼을 보여 줄 이유가 없다.
+   *
+   * 이 글에 그 브랜드가 골라져 있었다면 부모가 선택을 푼다(`onDeleted`). 여기서 하지
+   * 않는 이유는 고른 값을 들고 있는 곳이 부모이기 때문이다.
+   */
+  async function remove() {
+    if (!brand || !onDeleted) return;
+    const attached =
+      brand.images.length || brand.documents.length
+        ? ` 올려 둔 이미지 ${brand.images.length}장과 문서 ${brand.documents.length}개도 함께 지워집니다.`
+        : "";
+    if (!window.confirm(`'${brand.name}' 자료를 삭제할까요? 되돌릴 수 없습니다.${attached}`)) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await request(`/brands/${encodeURIComponent(brand.brandId)}`, { method: "DELETE" });
+      showToast(`${brand.name} 자료를 삭제했습니다.`);
+      onDeleted(brand.brandId);
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function save() {
@@ -662,6 +717,21 @@ export function BrandEditor({ brand, attachments, attachmentCounts, onSaved, onC
               <span className="brand-field-hint" role="status">
                 첨부 자료를 불러온 뒤 저장할 수 있어요.
               </span>
+            )}
+            {/* 지우기는 저장·취소와 **떨어뜨려** 왼쪽 끝에 둔다(CSS의 margin-right:auto).
+                되돌릴 수 없는 동작이 '취소' 바로 옆에 붙어 있으면 잘못 누른다.
+
+                새로 만드는 중이면 지울 것이 없고, 기본 브랜드는 지울 수 없다. */}
+            {deletable && (
+              <button
+                className="button danger brand-delete-button"
+                type="button"
+                onClick={() => void remove()}
+                disabled={busy}
+              >
+                <TrashIcon />
+                자료 삭제
+              </button>
             )}
             <button className="button" type="button" onClick={onCancel} disabled={busy}>
               취소

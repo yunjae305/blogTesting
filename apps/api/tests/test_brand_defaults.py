@@ -102,6 +102,24 @@ class TestUserEditsSurvive:
         assert len(brand.images) == 1
 
 
+class TestTheScreenKnowsWhichOneIsDefault:
+    """화면도 기본 브랜드의 id를 안다 — **삭제 버튼을 내주지 않기 위해서**다.
+
+    서버가 삭제를 거부하므로, 눌러 봐야 오류만 나는 버튼을 보여 줄 이유가 없다. 두 값이
+    어긋나면 지울 수 없는 브랜드에 삭제 버튼이 뜬다. 원고 편수 상한(MAX_DRAFT_COUNT)을
+    양쪽에서 대조하는 것과 같은 자리다.
+    """
+
+    def test_the_client_and_the_server_agree_on_the_id(self):
+        from pathlib import Path
+
+        # tests/ -> apps/api -> apps -> apps/web/src/constants.ts
+        source = Path(__file__).resolve().parents[2] / "web" / "src" / "constants.ts"
+        text = source.read_text(encoding="utf-8")
+
+        assert f'DEFAULT_BRAND_ID = "{DEFAULT_BRAND_ID}"' in text
+
+
 @pytest.mark.asyncio
 class TestTheDefaultCannotBeDeleted:
     async def test_deleting_it_says_why_instead_of_quietly_coming_back(self):

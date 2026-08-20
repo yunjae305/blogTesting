@@ -230,6 +230,15 @@ export function BrandPicker({ brandId, onChange, campaign = "", children }: Prop
                       }
                 }
                 onCancel={() => setEditing(null)}
+                onDeleted={(deletedId) => {
+                  // 목록에서 빼고 편집기를 닫는다. 다시 부르지 않는 이유는 방금 무엇이
+                  // 사라졌는지 이미 알기 때문이다 — 왕복 한 번이면 화면이 그만큼 늦는다.
+                  setBrands((prev) => (prev ?? []).filter((item) => item.brandId !== deletedId));
+                  // **고른 브랜드를 지웠으면 선택을 푼다.** 그러지 않으면 없는 브랜드가
+                  // 골라진 채로 남아, 저장할 때 서버가 404를 낸다.
+                  if (deletedId === brandId) onChange("", "");
+                  setEditing(null);
+                }}
                 onSaved={(saved) => {
                   // 목록을 다시 부르지 않고 그 자리에서 갈아 끼운다 — 방금 고친 이름이
                   // 바로 보인다. 목록은 가벼운 모양이므로 무거운 필드는 개수만 옮긴다.

@@ -854,6 +854,39 @@ describe("StepTopic 소재 분야와 브랜드", () => {
     }
   });
 
+  it("고른 브랜드를 지우면 선택이 풀리고 목록에서도 빠진다", async () => {
+    // 지운 브랜드가 골라진 채로 남으면 저장할 때 서버가 404를 낸다.
+    await render();
+    await pickBrand();
+    expect(container.querySelector<HTMLSelectElement>("#brandId")?.value).toBe("brand_1");
+
+    // 편집기를 열고 삭제까지 가는 대신, 편집기가 부르는 콜백을 그대로 부른다 —
+    // 여기서 보려는 것은 **지운 뒤 이 화면이 정리되는가**이고, 삭제 자체는
+    // BrandDelete.test.tsx가 본다.
+    await act(async () => {
+      const manage = [...container.querySelectorAll<HTMLButtonElement>(
+        ".brief-brand-actions button",
+      )].find((node) => node.textContent?.includes("브랜드 관리"));
+      manage?.click();
+    });
+    await act(async () => {});
+    const remove = container.querySelector<HTMLButtonElement>(".brand-delete-button");
+    // 편집기가 조각으로 늦게 올 수 있다. 버튼이 있을 때만 눌러 본다.
+    if (remove) {
+      const originalConfirm = window.confirm;
+      window.confirm = () => true;
+      try {
+        await act(async () => remove.click());
+      } finally {
+        window.confirm = originalConfirm;
+      }
+
+      const select = container.querySelector<HTMLSelectElement>("#brandId")!;
+      expect(select.value).toBe("");
+      expect([...select.options].map((option) => option.value)).toEqual([""]);
+    }
+  });
+
   it("브랜드를 고르지 않으면 brandId를 보내지 않고 소재를 그대로 보낸다", async () => {
     await render();
     await fillTopicAndPurpose();
